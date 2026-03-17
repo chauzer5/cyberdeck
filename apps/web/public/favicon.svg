@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none">
+  <!-- Deep purple background -->
+  <rect width="32" height="32" rx="7" fill="#110d1e"/>
+  <!-- Neon pink border glow -->
+  <rect x="1" y="1" width="30" height="30" rx="6" stroke="#ff2d7b" stroke-width="1" opacity="0.4"/>
+  <!-- CPU/circuit icon -->
+  <rect x="10" y="10" width="12" height="12" rx="2" stroke="#ff2d7b" stroke-width="1.5"/>
+  <!-- Inner core -->
+  <rect x="13" y="13" width="6" height="6" rx="1" fill="#ff2d7b" opacity="0.8"/>
+  <!-- Circuit traces -->
+  <line x1="16" y1="6" x2="16" y2="10" stroke="#00f0ff" stroke-width="1.2" stroke-linecap="round"/>
+  <line x1="16" y1="22" x2="16" y2="26" stroke="#00f0ff" stroke-width="1.2" stroke-linecap="round"/>
+  <line x1="6" y1="16" x2="10" y2="16" stroke="#00f0ff" stroke-width="1.2" stroke-linecap="round"/>
+  <line x1="22" y1="16" x2="26" y2="16" stroke="#00f0ff" stroke-width="1.2" stroke-linecap="round"/>
+  <!-- Corner traces -->
+  <line x1="8" y1="8" x2="11" y2="11" stroke="#00f0ff" stroke-width="1" stroke-linecap="round" opacity="0.5"/>
+  <line x1="24" y1="8" x2="21" y2="11" stroke="#00f0ff" stroke-width="1" stroke-linecap="round" opacity="0.5"/>
+  <line x1="8" y1="24" x2="11" y2="21" stroke="#00f0ff" stroke-width="1" stroke-linecap="round" opacity="0.5"/>
+  <line x1="24" y1="24" x2="21" y2="21" stroke="#00f0ff" stroke-width="1" stroke-linecap="round" opacity="0.5"/>
+</svg>

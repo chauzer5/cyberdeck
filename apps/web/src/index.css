@@ -1,0 +1,252 @@
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700;800&family=Orbitron:wght@400;500;600;700;800;900&family=Bebas+Neue&display=swap');
+@import "tailwindcss";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme {
+  /* Neon Cyberpunk palette */
+  --color-background: #110d1e;
+  --color-foreground: #d4caee;
+  --color-card: rgba(28, 20, 50, 0.65);
+  --color-card-foreground: #d4caee;
+  --color-popover: #1a1230;
+  --color-popover-foreground: #d4caee;
+  --color-primary: #ff2d7b;
+  --color-primary-foreground: #f8f5ff;
+  --color-secondary: #2a1845;
+  --color-secondary-foreground: #d4caee;
+  --color-muted: #2a1845;
+  --color-muted-foreground: #9d93c4;
+  --color-accent: #ff2d7b;
+  --color-accent-foreground: #f8f5ff;
+  --color-destructive: #ef4444;
+  --color-destructive-foreground: #fca5a5;
+  --color-border: rgba(255, 45, 123, 0.1);
+  --color-input: rgba(255, 45, 123, 0.1);
+  --color-ring: rgba(0, 240, 255, 0.3);
+
+  --color-sidebar-background: rgba(22, 16, 42, 0.95);
+  --color-sidebar-foreground: #9d93c4;
+  --color-sidebar-primary: #ff2d7b;
+  --color-sidebar-primary-foreground: #f8f5ff;
+  --color-sidebar-accent: rgba(255, 45, 123, 0.1);
+  --color-sidebar-accent-foreground: #f8f5ff;
+  --color-sidebar-border: rgba(255, 45, 123, 0.08);
+  --color-sidebar-ring: rgba(0, 240, 255, 0.3);
+
+  /* Neon tokens */
+  --color-neon-pink: #ff2d7b;
+  --color-neon-pink-mid: #ff5a9e;
+  --color-neon-pink-light: #ff8abe;
+  --color-neon-pink-bright: #ffb8d9;
+  --color-neon-pink-dark: #4a0e2a;
+  --color-neon-cyan: #00f0ff;
+  --color-neon-purple: #c026d3;
+  --color-neon-green: #00ff88;
+  --color-neon-orange: #ff6a00;
+  --color-neon-yellow: #facc15;
+  --color-cream: #f8f5ff;
+  --color-text-primary: #d4caee;
+  --color-text-secondary: #b0a6d4;
+  --color-text-muted: #9d93c4;
+  --color-glass: rgba(28, 20, 50, 0.65);
+  --color-glass-border: rgba(255, 45, 123, 0.1);
+  --color-glass-shine: rgba(0, 240, 255, 0.05);
+  --color-border-hover: rgba(255, 45, 123, 0.25);
+  --color-amber: #f59e0b;
+
+  --radius-sm: 0.375rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 0.75rem;
+  --radius-xl: 1rem;
+
+  --font-display: 'Orbitron', sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+  --font-heading: 'Bebas Neue', sans-serif;
+}
+
+/* Ambient neon glow */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background:
+    radial-gradient(ellipse 35% 45% at 10% 90%, rgba(255, 45, 123, 0.22) 0%, transparent 60%),
+    radial-gradient(ellipse 25% 35% at 90% 10%, rgba(0, 240, 255, 0.16) 0%, transparent 55%),
+    radial-gradient(ellipse 40% 30% at 50% 50%, rgba(192, 38, 211, 0.08) 0%, transparent 60%),
+    radial-gradient(ellipse 20% 50% at 95% 85%, rgba(255, 106, 0, 0.08) 0%, transparent 50%);
+}
+
+/* CRT Scanline overlay */
+.scanlines {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9999;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent 0px,
+    transparent 2px,
+    rgba(0, 0, 0, 0.06) 2px,
+    rgba(0, 0, 0, 0.06) 4px
+  );
+  mix-blend-mode: multiply;
+}
+
+/* Perspective grid floor */
+.grid-floor {
+  position: fixed;
+  bottom: 0;
+  left: -20%;
+  right: -20%;
+  height: 40vh;
+  pointer-events: none;
+  z-index: 0;
+  background:
+    linear-gradient(0deg, rgba(255, 45, 123, 0.1) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 45, 123, 0.07) 1px, transparent 1px);
+  background-size: 60px 40px;
+  transform: perspective(400px) rotateX(45deg);
+  transform-origin: bottom center;
+  mask-image: linear-gradient(to top, rgba(0,0,0,0.5), transparent 80%);
+  -webkit-mask-image: linear-gradient(to top, rgba(0,0,0,0.5), transparent 80%);
+}
+
+/* Glass panel base */
+.glass {
+  background: var(--color-glass);
+  backdrop-filter: blur(24px) saturate(1.1);
+  -webkit-backdrop-filter: blur(24px) saturate(1.1);
+  border: 1px solid var(--color-glass-border);
+}
+
+/* Top-edge shine on glass panels — gradient from pink to cyan */
+.glass-shine {
+  position: relative;
+}
+
+.glass-shine::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 45, 123, 0.2),
+    rgba(0, 240, 255, 0.15),
+    rgba(255, 45, 123, 0.1),
+    transparent
+  );
+  z-index: 1;
+}
+
+/* Gradient border effect on cards */
+.glass-border-gradient {
+  position: relative;
+}
+
+.glass-border-gradient::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(135deg, rgba(255, 45, 123, 0.15), transparent 40%, transparent 60%, rgba(0, 240, 255, 0.1));
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+}
+
+/* Panel entrance animation */
+@keyframes glass-in {
+  from {
+    opacity: 0;
+    transform: translateY(16px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.animate-glass-in {
+  animation: glass-in 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* Staggered delays for panel grid children */
+.stagger-1 { animation-delay: 0.06s; }
+.stagger-2 { animation-delay: 0.12s; }
+.stagger-3 { animation-delay: 0.18s; }
+.stagger-4 { animation-delay: 0.24s; }
+.stagger-5 { animation-delay: 0.3s; }
+
+/* Floating particle animation */
+@keyframes float-up {
+  0% { transform: translateY(100vh); opacity: 0; }
+  10% { opacity: 0.3; }
+  90% { opacity: 0.3; }
+  100% { transform: translateY(-100px); opacity: 0; }
+}
+
+/* Glow pulse for status indicators */
+@keyframes glow-pulse {
+  0%, 100% { box-shadow: 0 0 6px currentColor; opacity: 1; }
+  50% { box-shadow: 0 0 2px currentColor; opacity: 0.7; }
+}
+
+.animate-glow-pulse {
+  animation: glow-pulse 3s ease-in-out infinite;
+}
+
+/* Glitch effect for title */
+@keyframes glitch-1 {
+  0%, 88%, 92%, 100% { opacity: 0; transform: translate(0); }
+  89% { opacity: 0.8; transform: translate(-3px, -1px); }
+  91% { opacity: 0.6; transform: translate(2px, 1px); }
+}
+
+@keyframes glitch-2 {
+  0%, 90%, 94%, 100% { opacity: 0; transform: translate(0); }
+  91% { opacity: 0.8; transform: translate(3px, 1px); }
+  93% { opacity: 0.5; transform: translate(-2px, -1px); }
+}
+
+/* Heartbeat for status dots */
+@keyframes heartbeat {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(0.7); opacity: 0.5; }
+}
+
+.animate-heartbeat {
+  animation: heartbeat 2s infinite;
+}
+
+/* Force xterm viewport transparent so dashboard background shows through */
+.xterm-viewport {
+  background-color: transparent !important;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 4px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 45, 123, 0.15);
+  border-radius: 2px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 45, 123, 0.3);
+}
