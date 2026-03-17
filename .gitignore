@@ -5,3 +5,7 @@ data/
 *.tsbuildinfo
 .DS_Store
 mockups/
+
+# Tauri
+src-tauri/target/
+src-tauri/gen/
