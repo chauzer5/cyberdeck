@@ -95,6 +95,7 @@ export interface EnrichedMergeRequest extends MergeRequest {
   is_team_member: boolean;
   needs_your_approval: boolean;
   approval_rules_needing_you: string[];
+  approved: boolean;
   you_are_mentioned: boolean;
 }
 
@@ -187,6 +188,26 @@ export interface MRDetail {
   updated_at: string;
 }
 
+// ── Org members ──
+
+export interface GitLabMember {
+  id: number;
+  name: string;
+  username: string;
+  email?: string;
+  avatar_url?: string;
+}
+
+export async function listGroupMembers(): Promise<GitLabMember[]> {
+  const token = await getToken();
+  const groupId = await getGroupId();
+  const members: GitLabMember[] = await gitlabFetch(
+    `/groups/${groupId}/members/all?per_page=100`,
+    token,
+  );
+  return members.sort((a, b) => a.name.localeCompare(b.name));
+}
+
 // ── Helpers ──
 
 function toMergeRequest(raw: MergeRequestRaw): MergeRequest {
@@ -221,17 +242,26 @@ async function enrichMR(
 ): Promise<EnrichedMergeRequest> {
   const base = `/projects/${mr.project_id}/merge_requests/${mr.iid}`;
 
-  // Fetch approval state
-  const approvalState: { rules: ApprovalRule[] } = await gitlabFetch(
-    `${base}/approval_state`,
-    token,
-  );
+  // Fetch MR detail (for up-to-date pipeline status) and approval state
+  const [mrDetail, approvalState] = await Promise.all([
+    gitlabFetch(base, token) as Promise<MergeRequestRaw>,
+    gitlabFetch(`${base}/approval_state`, token) as Promise<{ rules: ApprovalRule[] }>,
+  ]);
+
+  // Update pipeline status from the per-MR endpoint (group list endpoint may omit it)
+  mr.pipeline_status = mrDetail.head_pipeline?.status ?? null;
 
   let needs_your_approval = false;
   const approval_rules_needing_you: string[] = [];
 
-  for (const rule of approvalState.rules ?? []) {
-    if (rule.rule_type === "any_approver" || rule.rule_type === "report_approver") continue;
+  const meaningfulRules = (approvalState.rules ?? []).filter(
+    (r) => r.rule_type !== "any_approver" && r.rule_type !== "report_approver" && r.rule_type !== "code_owner",
+  );
+  const approved = meaningfulRules.length > 0
+    ? meaningfulRules.every((r) => r.approved || r.approvals_required === 0)
+    : (approvalState.rules ?? []).some((r) => (r.approved_by ?? []).length > 0);
+
+  for (const rule of meaningfulRules) {
     if (rule.approved || rule.approvals_required === 0) continue;
     const isEligible = (rule.eligible_approvers ?? []).some((a) => a.id === userId);
     if (isEligible) {
@@ -259,6 +289,7 @@ async function enrichMR(
     is_team_member,
     needs_your_approval,
     approval_rules_needing_you,
+    approved,
     you_are_mentioned,
   };
 }
@@ -458,36 +489,17 @@ export async function testConnection(): Promise<string> {
   return `${user.name} (${user.username})`;
 }
 
-// Helper: get Linear team member names for cross-referencing
+// Helper: get team member names from stored settings
 async function getLinearTeamNames(): Promise<Set<string>> {
   try {
-    const keyRow = await db
+    const row = await db
       .select()
       .from(settings)
-      .where(eq(settings.key, "linear.apiKey"))
+      .where(eq(settings.key, "team.members"))
       .get();
-    const teamIdRow = await db
-      .select()
-      .from(settings)
-      .where(eq(settings.key, "linear.teamId"))
-      .get();
-    if (!keyRow?.value) return new Set();
-
-    const teamId = teamIdRow?.value ?? "d097c0ee-3414-4d3e-9ff9-56017012a45a";
-    const query = `{ team(id: "${teamId}") { members { nodes { id name } } } }`;
-
-    const resp = await fetch("https://api.linear.app/graphql", {
-      method: "POST",
-      headers: {
-        Authorization: keyRow.value,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ query }),
-    });
-
-    const json = await resp.json();
-    const members = json?.data?.team?.members?.nodes ?? [];
-    return new Set(members.map((m: { name: string }) => m.name));
+    if (!row?.value) return new Set();
+    const names: string[] = JSON.parse(row.value);
+    return new Set(names);
   } catch {
     return new Set();
   }

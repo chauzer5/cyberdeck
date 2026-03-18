@@ -1,15 +1,20 @@
 import { createRoute } from "@tanstack/react-router";
 import { rootRoute } from "./__root";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import {
   LayoutList,
   ArrowLeft,
   ExternalLink,
   Loader2,
+  RefreshCw,
   X,
+  Users,
+  Settings,
+  Check,
 } from "lucide-react";
 import { trpc } from "@/trpc";
 import { cn } from "@/lib/utils";
+import { TeamSetupModal } from "@/components/TeamSetupModal";
 
 // ── Helpers ──
 
@@ -269,6 +274,78 @@ function IssueDetailView({
   );
 }
 
+// ── Board Picker Modal ──
+
+function BoardPickerModal({ onClose }: { onClose: () => void }) {
+  const { data: teams, isLoading } = trpc.linear.teams.useQuery();
+  const currentTeamId = trpc.settings.get.useQuery({ key: "linear.readyTeamId" });
+  const setSetting = trpc.settings.set.useMutation();
+  const utils = trpc.useUtils();
+
+  function selectTeam(teamId: string) {
+    setSetting.mutate(
+      { key: "linear.readyTeamId", value: teamId },
+      {
+        onSuccess: () => {
+          utils.settings.get.invalidate({ key: "linear.readyTeamId" });
+          utils.linear.readyIssues.invalidate();
+          onClose();
+        },
+      },
+    );
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center">
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative z-10 w-full max-w-sm rounded-xl border border-border bg-background shadow-2xl">
+        <div className="flex items-center justify-between border-b border-border px-5 py-4">
+          <div>
+            <h2 className="text-sm font-semibold text-cream">Select Board</h2>
+            <p className="mt-0.5 text-[11px] text-text-muted">
+              Choose a team board for ready tickets
+            </p>
+          </div>
+          <button onClick={onClose} className="rounded p-1 text-text-muted hover:text-cream">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        <div className="max-h-[350px] overflow-y-auto p-3">
+          {isLoading && (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="h-5 w-5 animate-spin text-neon-pink" />
+            </div>
+          )}
+          {teams && (
+            <div className="space-y-1">
+              {teams.map((team) => (
+                <button
+                  key={team.id}
+                  onClick={() => selectTeam(team.id)}
+                  disabled={setSetting.isPending}
+                  className={cn(
+                    "flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left transition-all",
+                    currentTeamId.data === team.id
+                      ? "bg-neon-pink-dark/40 border border-neon-pink/20"
+                      : "border border-transparent hover:bg-card",
+                  )}
+                >
+                  <span className="text-[10px] font-mono text-neon-pink">{team.key}</span>
+                  <span className="text-xs font-medium text-cream">{team.name}</span>
+                  {currentTeamId.data === team.id && (
+                    <Check className="ml-auto h-3.5 w-3.5 text-neon-pink" />
+                  )}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Main Page ──
 
 type Tab = "mine" | "team" | "ready";
@@ -276,19 +353,44 @@ type Tab = "mine" | "team" | "ready";
 function LinearPage() {
   const [tab, setTab] = useState<Tab>("mine");
   const [selectedIssue, setSelectedIssue] = useState<string | null>(null);
+  const [showTeamSetup, setShowTeamSetup] = useState(false);
+  const [showBoardPicker, setShowBoardPicker] = useState(false);
+  const [syncing, setSyncing] = useState(false);
   const { data: allIssues, isLoading, isError, refetch } = trpc.linear.issues.useQuery(
     undefined,
-    { refetchInterval: 60_000 },
+    { refetchInterval: 30_000 },
   );
+  const { data: readyIssuesData, isLoading: readyLoading } = trpc.linear.readyIssues.useQuery(
+    undefined,
+    { refetchInterval: 30_000 },
+  );
+  const { data: teamMembers } = trpc.team.members.useQuery();
+  const utils = trpc.useUtils();
 
-  const { myIssues, teamIssues, readyIssues } = useMemo(() => {
-    if (!allIssues) return { myIssues: [], teamIssues: [], readyIssues: [] };
+  const handleSync = useCallback(async () => {
+    setSyncing(true);
+    try {
+      await Promise.all([
+        utils.linear.issues.invalidate(),
+        utils.linear.readyIssues.invalidate(),
+      ]);
+    } finally {
+      setSyncing(false);
+    }
+  }, [utils]);
+  const teamConfigured = teamMembers && teamMembers.length > 0;
+  const readyTeamId = trpc.settings.get.useQuery({ key: "linear.readyTeamId" });
+  const readyBoardConfigured = !!readyTeamId.data;
+
+  const { myIssues, teamIssues } = useMemo(() => {
+    if (!allIssues) return { myIssues: [], teamIssues: [] };
     return {
       myIssues: capDeployed(allIssues.filter((i) => i.assignee_is_me)),
       teamIssues: capDeployed(allIssues.filter((i) => i.assignee_is_team)),
-      readyIssues: allIssues.filter((i) => i.status === "Ready to Start"),
     };
   }, [allIssues]);
+
+  const readyIssues = readyIssuesData ?? [];
 
   const currentIssues =
     tab === "mine"
@@ -318,6 +420,17 @@ function LinearPage() {
           </h1>
           <p className="mt-0.5 text-xs text-text-muted">Issues and tickets</p>
         </div>
+        <button
+          onClick={handleSync}
+          disabled={syncing}
+          className={cn(
+            "flex items-center gap-1.5 rounded-lg border border-border bg-transparent px-3.5 py-[7px] text-xs font-medium text-text-secondary transition-all hover:border-border-hover hover:bg-[rgba(255,45,123,0.06)]",
+            syncing && "pointer-events-none opacity-60"
+          )}
+        >
+          <RefreshCw className={cn("h-3.5 w-3.5", syncing && "animate-spin")} />
+          {syncing ? "Syncing…" : "Sync"}
+        </button>
       </div>
 
       {/* Tabs */}
@@ -373,22 +486,134 @@ function LinearPage() {
             </button>
           </div>
         )}
-        {!isLoading && !isError && currentIssues.length === 0 && (
+        {/* Team tab: show setup prompt if no team configured */}
+        {!isLoading && !isError && tab === "team" && !teamConfigured && (
           <div className="flex items-center justify-center pt-16">
             <div className="text-center">
-              <LayoutList className="mx-auto h-10 w-10 text-text-muted opacity-30" />
-              <p className="mt-3 text-sm text-text-muted">No tickets</p>
+              <Users className="mx-auto h-10 w-10 text-text-muted opacity-30" />
+              <p className="mt-3 text-sm text-text-muted">No team configured</p>
+              <p className="mt-1 text-xs text-text-muted">
+                Select your teammates to see their issues here
+              </p>
+              <button
+                onClick={() => setShowTeamSetup(true)}
+                className="mt-4 rounded-lg bg-neon-pink-dark px-4 py-2 text-xs font-medium text-neon-pink-bright transition-all hover:bg-neon-pink"
+              >
+                Set Up Team
+              </button>
             </div>
           </div>
         )}
-        <div className="space-y-2">
-          {currentIssues.map((issue, i) => (
-            <div key={issue.id} className={cn("animate-glass-in", `stagger-${Math.min(i + 1, 5)}`)}>
-              <IssueCard issue={issue} onOpen={setSelectedIssue} />
+        {/* Team tab: show edit button + issues when team is configured */}
+        {!isLoading && !isError && tab === "team" && teamConfigured && (
+          <>
+            <div className="mb-3 flex items-center justify-between">
+              <span className="text-[11px] text-text-muted">
+                {teamMembers.length} team member{teamMembers.length !== 1 ? "s" : ""}
+              </span>
+              <button
+                onClick={() => setShowTeamSetup(true)}
+                className="flex items-center gap-1 rounded-lg border border-border px-2.5 py-1 text-[11px] text-text-muted transition-all hover:border-border-hover hover:text-cream"
+              >
+                <Settings className="h-3 w-3" />
+                Edit Team
+              </button>
             </div>
-          ))}
-        </div>
+            {currentIssues.length === 0 && (
+              <div className="flex items-center justify-center pt-12">
+                <div className="text-center">
+                  <LayoutList className="mx-auto h-10 w-10 text-text-muted opacity-30" />
+                  <p className="mt-3 text-sm text-text-muted">No tickets</p>
+                </div>
+              </div>
+            )}
+            <div className="space-y-2">
+              {currentIssues.map((issue, i) => (
+                <div key={issue.id} className={cn("animate-glass-in", `stagger-${Math.min(i + 1, 5)}`)}>
+                  <IssueCard issue={issue} onOpen={setSelectedIssue} />
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+        {/* Ready tab: show board picker if not configured */}
+        {!isLoading && !isError && tab === "ready" && !readyBoardConfigured && (
+          <div className="flex items-center justify-center pt-16">
+            <div className="text-center">
+              <LayoutList className="mx-auto h-10 w-10 text-text-muted opacity-30" />
+              <p className="mt-3 text-sm text-text-muted">No board selected</p>
+              <p className="mt-1 text-xs text-text-muted">
+                Choose a Linear team board to see unassigned ready tickets
+              </p>
+              <button
+                onClick={() => setShowBoardPicker(true)}
+                className="mt-4 rounded-lg bg-neon-pink-dark px-4 py-2 text-xs font-medium text-neon-pink-bright transition-all hover:bg-neon-pink"
+              >
+                Select Board
+              </button>
+            </div>
+          </div>
+        )}
+        {/* Ready tab: show issues when board is configured */}
+        {!isLoading && !isError && tab === "ready" && readyBoardConfigured && (
+          <>
+            <div className="mb-3 flex items-center justify-end">
+              <button
+                onClick={() => setShowBoardPicker(true)}
+                className="flex items-center gap-1 rounded-lg border border-border px-2.5 py-1 text-[11px] text-text-muted transition-all hover:border-border-hover hover:text-cream"
+              >
+                <Settings className="h-3 w-3" />
+                Change Board
+              </button>
+            </div>
+            {readyLoading && (
+              <div className="flex items-center justify-center pt-12">
+                <Loader2 className="h-5 w-5 animate-spin text-neon-pink" />
+              </div>
+            )}
+            {!readyLoading && readyIssues.length === 0 && (
+              <div className="flex items-center justify-center pt-12">
+                <div className="text-center">
+                  <LayoutList className="mx-auto h-10 w-10 text-text-muted opacity-30" />
+                  <p className="mt-3 text-sm text-text-muted">No ready tickets</p>
+                </div>
+              </div>
+            )}
+            <div className="space-y-2">
+              {readyIssues.map((issue, i) => (
+                <div key={issue.id} className={cn("animate-glass-in", `stagger-${Math.min(i + 1, 5)}`)}>
+                  <IssueCard issue={issue} onOpen={setSelectedIssue} />
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+        {/* Mine tab: normal rendering */}
+        {!isLoading && !isError && tab === "mine" && (
+          <>
+            {currentIssues.length === 0 && (
+              <div className="flex items-center justify-center pt-16">
+                <div className="text-center">
+                  <LayoutList className="mx-auto h-10 w-10 text-text-muted opacity-30" />
+                  <p className="mt-3 text-sm text-text-muted">No tickets</p>
+                </div>
+              </div>
+            )}
+            <div className="space-y-2">
+              {currentIssues.map((issue, i) => (
+                <div key={issue.id} className={cn("animate-glass-in", `stagger-${Math.min(i + 1, 5)}`)}>
+                  <IssueCard issue={issue} onOpen={setSelectedIssue} />
+                </div>
+              ))}
+            </div>
+          </>
+        )}
       </div>
+
+      {/* Team setup modal */}
+      {showTeamSetup && <TeamSetupModal onClose={() => setShowTeamSetup(false)} />}
+      {/* Board picker modal */}
+      {showBoardPicker && <BoardPickerModal onClose={() => setShowBoardPicker(false)} />}
     </div>
   );
 }

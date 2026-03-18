@@ -1,10 +1,18 @@
 import { z } from "zod";
 import { router, publicProcedure } from "../../trpc.js";
-import { getIssues, getIssueDetail, addComment, testConnection } from "./client.js";
+import { getIssues, getIssueDetail, addComment, testConnection, listTeams, getReadyIssues } from "./client.js";
 
 export const linearRouter = router({
   issues: publicProcedure.query(async () => {
     return getIssues();
+  }),
+
+  readyIssues: publicProcedure.query(async () => {
+    return getReadyIssues();
+  }),
+
+  teams: publicProcedure.query(async () => {
+    return listTeams();
   }),
 
   issueDetail: publicProcedure

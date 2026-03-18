@@ -8,6 +8,7 @@ import { migrate } from "./db/index.js";
 import { onOpen, onMessage, onClose } from "./ws/index.js";
 import { startSlackPoller } from "./slack/poller.js";
 import { startDmPoller } from "./slack/dm-poller.js";
+import { startMRPoller } from "./integrations/source-control/poller.js";
 import { backfillTeamIds } from "./slack/backfill-team-ids.js";
 
 // Run migrations
@@ -19,6 +20,7 @@ backfillTeamIds();
 // Start background services
 startSlackPoller();
 startDmPoller();
+startMRPoller();
 
 const app = new Hono();
 

@@ -248,11 +248,6 @@ function SettingsPage() {
                 placeholder="glpat-xxxxxxxxxxxxxxxxxxxx"
                 testMutation={testGitLab}
               />
-              <CredentialRow
-                label="Group ID"
-                settingKey="gitlab.groupId"
-                placeholder="12742924"
-              />
             </div>
           </section>
 
@@ -269,11 +264,6 @@ function SettingsPage() {
                 placeholder="ghp_xxxxxxxxxxxxxxxxxxxx"
                 testMutation={testGitHub}
               />
-              <CredentialRow
-                label="Organization"
-                settingKey="github.org"
-                placeholder="my-org"
-              />
             </div>
           </section>
 
@@ -289,11 +279,6 @@ function SettingsPage() {
                 settingKey="linear.apiKey"
                 placeholder="lin_api_xxxxxxxxxxxxxxxxxxxx"
                 testMutation={testLinear}
-              />
-              <CredentialRow
-                label="Team ID"
-                settingKey="linear.teamId"
-                placeholder="d097c0ee-3414-4d3e-9ff9-56017012a45a"
               />
             </div>
           </section>

@@ -111,6 +111,7 @@ export interface EnrichedPullRequest extends PullRequest {
   is_mine: boolean;
   is_team_member: boolean;
   needs_your_review: boolean;
+  approved: boolean;
   you_are_mentioned: boolean;
 }
 
@@ -158,6 +159,42 @@ export interface PRDetail {
   can_merge: boolean;
   created_at: string;
   updated_at: string;
+}
+
+// ── Org members ──
+
+export interface GitHubMember {
+  id: number;
+  login: string;
+  name: string | null;
+  email: string | null;
+  avatar_url: string;
+}
+
+export async function listOrgMembers(): Promise<GitHubMember[]> {
+  const token = await getToken();
+  const org = await getOrg();
+  const members: { login: string; id: number; avatar_url: string }[] = await githubFetch(
+    `/orgs/${org}/members?per_page=100`,
+    token,
+  );
+  // Fetch full profile for each to get name/email
+  const detailed = await Promise.allSettled(
+    members.map(async (m) => {
+      const user: GitHubUser & { email?: string | null } = await githubFetch(`/users/${m.login}`, token);
+      return {
+        id: m.id,
+        login: m.login,
+        name: user.name || m.login,
+        email: user.email || null,
+        avatar_url: m.avatar_url,
+      } satisfies GitHubMember;
+    }),
+  );
+  return detailed
+    .filter((r): r is PromiseFulfilledResult<GitHubMember> => r.status === "fulfilled")
+    .map((r) => r.value)
+    .sort((a, b) => (a.name ?? a.login).localeCompare(b.name ?? b.login));
 }
 
 // ── Helpers ──
@@ -213,6 +250,25 @@ async function enrichPR(
     // ignore
   }
 
+  // Get approval status from reviews
+  let approved = false;
+  try {
+    const reviews: { user: { login: string }; state: string }[] = await githubFetch(
+      `/repos/${repo}/pulls/${pr.number}/reviews`,
+      token,
+    );
+    // Keep only the latest review per user
+    const latestByUser = new Map<string, string>();
+    for (const r of reviews) {
+      if (r.state === "APPROVED" || r.state === "CHANGES_REQUESTED") {
+        latestByUser.set(r.user.login, r.state);
+      }
+    }
+    approved = latestByUser.size > 0 && [...latestByUser.values()].every((s) => s === "APPROVED");
+  } catch {
+    // ignore
+  }
+
   return {
     id: pr.id,
     number: pr.number,
@@ -235,6 +291,7 @@ async function enrichPR(
     is_mine,
     is_team_member,
     needs_your_review,
+    approved,
     you_are_mentioned,
   };
 }
@@ -435,36 +492,17 @@ export async function testConnection(): Promise<string> {
   return `${user.name || user.login} (${user.login})`;
 }
 
-// Helper: get Linear team member names for cross-referencing
+// Helper: get team member names from stored settings
 async function getLinearTeamNames(): Promise<Set<string>> {
   try {
-    const keyRow = await db
+    const row = await db
       .select()
       .from(settings)
-      .where(eq(settings.key, "linear.apiKey"))
+      .where(eq(settings.key, "team.members"))
       .get();
-    const teamIdRow = await db
-      .select()
-      .from(settings)
-      .where(eq(settings.key, "linear.teamId"))
-      .get();
-    if (!keyRow?.value) return new Set();
-
-    const teamId = teamIdRow?.value ?? "d097c0ee-3414-4d3e-9ff9-56017012a45a";
-    const query = `{ team(id: "${teamId}") { members { nodes { id name } } } }`;
-
-    const resp = await fetch("https://api.linear.app/graphql", {
-      method: "POST",
-      headers: {
-        Authorization: keyRow.value,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ query }),
-    });
-
-    const json = await resp.json();
-    const members = json?.data?.team?.members?.nodes ?? [];
-    return new Set(members.map((m: { name: string }) => m.name));
+    if (!row?.value) return new Set();
+    const names: string[] = JSON.parse(row.value);
+    return new Set(names);
   } catch {
     return new Set();
   }

@@ -14,14 +14,6 @@ async function getApiKey(): Promise<string> {
   return row.value;
 }
 
-async function getTeamId(): Promise<string> {
-  const row = await db
-    .select()
-    .from(settings)
-    .where(eq(settings.key, "linear.teamId"))
-    .get();
-  return row?.value ?? "d097c0ee-3414-4d3e-9ff9-56017012a45a";
-}
 
 async function linearQuery<T>(apiKey: string, query: string): Promise<T> {
   const resp = await fetch(LINEAR_API, {
@@ -108,7 +100,7 @@ interface IssueDetailRaw extends IssueRaw {
 
 export async function getIssues(): Promise<LinearIssue[]> {
   const apiKey = await getApiKey();
-  const teamId = await getTeamId();
+  const teamMemberNames = new Set(await getTeamMembers());
 
   // Get viewer's assigned issues
   const myData = await linearQuery<{
@@ -135,21 +127,33 @@ export async function getIssues(): Promise<LinearIssue[]> {
     }`,
   );
 
-  // Get team issues + members
-  const teamData = await linearQuery<{
-    team: {
-      members: { nodes: { id: string; name: string }[] };
+  const myIssueIds = new Set(myData.viewer.assignedIssues.nodes.map((i) => i.id));
+
+  // If team members are configured, also fetch their issues
+  const allRaw: IssueRaw[] = [];
+  const seen = new Set<string>();
+
+  for (const issue of myData.viewer.assignedIssues.nodes) {
+    if (!seen.has(issue.id)) {
+      seen.add(issue.id);
+      allRaw.push(issue);
+    }
+  }
+
+  if (teamMemberNames.size > 0) {
+    // Fetch all org issues that are open and assigned to team members
+    const orgData = await linearQuery<{
       issues: { nodes: IssueRaw[] };
-    };
-  }>(
-    apiKey,
-    `{
-      team(id: "${teamId}") {
-        members { nodes { id name } }
+    }>(
+      apiKey,
+      `{
         issues(
-          first: 50
+          first: 100
           orderBy: updatedAt
-          filter: { state: { type: { nin: ["completed", "canceled"] } } }
+          filter: {
+            state: { type: { nin: ["completed", "canceled"] } }
+            assignee: { name: { in: [${[...teamMemberNames].map((n) => `"${n.replace(/"/g, '\\"')}"`).join(",")}] } }
+          }
         ) {
           nodes {
             id identifier title priority url
@@ -160,27 +164,14 @@ export async function getIssues(): Promise<LinearIssue[]> {
             updatedAt createdAt
           }
         }
+      }`,
+    );
+
+    for (const issue of orgData.issues.nodes) {
+      if (!seen.has(issue.id)) {
+        seen.add(issue.id);
+        allRaw.push(issue);
       }
-    }`,
-  );
-
-  const teamMemberNames = new Set(teamData.team.members.nodes.map((m) => m.name));
-  const myIssueIds = new Set(myData.viewer.assignedIssues.nodes.map((i) => i.id));
-
-  // Merge and deduplicate
-  const seen = new Set<string>();
-  const allRaw: IssueRaw[] = [];
-
-  for (const issue of myData.viewer.assignedIssues.nodes) {
-    if (!seen.has(issue.id)) {
-      seen.add(issue.id);
-      allRaw.push(issue);
-    }
-  }
-  for (const issue of teamData.team.issues.nodes) {
-    if (!seen.has(issue.id)) {
-      seen.add(issue.id);
-      allRaw.push(issue);
     }
   }
 
@@ -262,6 +253,113 @@ export async function addComment(issueId: string, body: string): Promise<boolean
     `mutation { commentCreate(input: { issueId: "${issueId}", body: "${escapedBody}" }) { success } }`,
   );
   return data.commentCreate.success;
+}
+
+export interface OrgMember {
+  id: string;
+  name: string;
+  email: string;
+  avatarUrl: string | null;
+  active: boolean;
+}
+
+export async function listOrgMembers(): Promise<OrgMember[]> {
+  const apiKey = await getApiKey();
+  const data = await linearQuery<{
+    organization: { users: { nodes: { id: string; name: string; email: string; avatarUrl: string | null; active: boolean }[] } };
+  }>(
+    apiKey,
+    `{ organization { users(first: 250) { nodes { id name email avatarUrl active } } } }`,
+  );
+  return data.organization.users.nodes
+    .filter((u) => u.active)
+    .sort((a, b) => a.name.localeCompare(b.name));
+}
+
+export async function getTeamMembers(): Promise<string[]> {
+  const row = await db
+    .select()
+    .from(settings)
+    .where(eq(settings.key, "team.members"))
+    .get();
+  if (!row?.value) return [];
+  try {
+    return JSON.parse(row.value);
+  } catch {
+    return [];
+  }
+}
+
+export interface LinearTeam {
+  id: string;
+  key: string;
+  name: string;
+}
+
+export async function listTeams(): Promise<LinearTeam[]> {
+  const apiKey = await getApiKey();
+  const data = await linearQuery<{
+    teams: { nodes: { id: string; key: string; name: string }[] };
+  }>(apiKey, `{ teams { nodes { id key name } } }`);
+  return data.teams.nodes.sort((a, b) => a.name.localeCompare(b.name));
+}
+
+export async function getReadyIssues(): Promise<LinearIssue[]> {
+  const apiKey = await getApiKey();
+
+  const teamIdRow = await db
+    .select()
+    .from(settings)
+    .where(eq(settings.key, "linear.readyTeamId"))
+    .get();
+  if (!teamIdRow?.value) return [];
+
+  const teamId = teamIdRow.value;
+
+  const data = await linearQuery<{
+    team: { issues: { nodes: IssueRaw[] } };
+  }>(
+    apiKey,
+    `{
+      team(id: "${teamId}") {
+        issues(
+          first: 50
+          orderBy: updatedAt
+          filter: {
+            state: { name: { eq: "Ready to Start" } }
+            assignee: { null: true }
+          }
+        ) {
+          nodes {
+            id identifier title priority url
+            state { name type }
+            assignee { id name }
+            team { key name }
+            labels { nodes { name } }
+            updatedAt createdAt
+          }
+        }
+      }
+    }`,
+  );
+
+  return data.team.issues.nodes.map((raw) => ({
+    id: raw.id,
+    identifier: raw.identifier,
+    title: raw.title,
+    status: raw.state.name,
+    status_type: raw.state.type,
+    priority: raw.priority,
+    assignee: raw.assignee?.name ?? null,
+    assignee_is_me: false,
+    assignee_is_team: false,
+    team_key: raw.team.key,
+    team_name: raw.team.name,
+    labels: raw.labels.nodes.map((l) => l.name),
+    url: raw.url,
+    updated_at: raw.updatedAt,
+    created_at: raw.createdAt,
+  }));
 }
 
 export async function testConnection(): Promise<string> {

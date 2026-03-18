@@ -8,7 +8,7 @@ export function SlackSummaryPanel() {
   const navigate = useNavigate();
 
   const latest = trpc.slack.conversations.latest.useQuery(undefined, {
-    refetchInterval: 60_000,
+    refetchInterval: 30_000,
   });
 
   const channelCount = latest.data?.length ?? 0;

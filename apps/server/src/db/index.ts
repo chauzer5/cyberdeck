@@ -189,5 +189,22 @@ export function migrate() {
     // Column already exists — expected on subsequent startups
   }
 
+  // Notifications table
+  sqlite.exec(`
+    CREATE TABLE IF NOT EXISTS notifications (
+      id TEXT PRIMARY KEY,
+      type TEXT NOT NULL CHECK(type IN ('slack_unread', 'mr_pipeline', 'mr_approval', 'todo_created')),
+      title TEXT NOT NULL,
+      detail TEXT,
+      url TEXT,
+      read INTEGER NOT NULL DEFAULT 0,
+      meta TEXT,
+      created_at TEXT NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_notifications_read_created
+      ON notifications(read, created_at);
+  `);
+
   console.log("[db] migrations applied");
 }

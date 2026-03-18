@@ -1,3 +1,4 @@
+import { useState, useCallback } from "react";
 import { createRoute } from "@tanstack/react-router";
 import { rootRoute } from "./__root";
 import { PanelGrid } from "@/components/layout/PanelGrid";
@@ -7,11 +8,26 @@ import { SlackSummaryPanel } from "@/components/panels/slack-summary";
 import { TodoPanel } from "@/components/panels/todos";
 import { useWebSocket } from "@/hooks/useWebSocket";
 import { useSlackEnabled } from "@/hooks/useSlackEnabled";
-import { RefreshCw } from "lucide-react";
+import { trpc } from "@/trpc";
+import { cn } from "@/lib/utils";
+import { RefreshCw, CheckCircle, XCircle } from "lucide-react";
 
 function Dashboard() {
   useWebSocket();
   const { enabled: slackEnabled } = useSlackEnabled();
+  const ping = trpc.health.ping.useQuery(undefined, { refetchInterval: 30_000 });
+  const serverUp = !!ping.data;
+  const utils = trpc.useUtils();
+  const [syncing, setSyncing] = useState(false);
+
+  const handleSyncAll = useCallback(async () => {
+    setSyncing(true);
+    try {
+      await utils.invalidate();
+    } finally {
+      setSyncing(false);
+    }
+  }, [utils]);
 
   const today = new Date().toLocaleDateString("en-US", {
     weekday: "long",
@@ -31,10 +47,27 @@ function Dashboard() {
             {today} — All systems operational
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <button className="flex items-center gap-1.5 rounded-lg border border-border bg-transparent px-3.5 py-[7px] text-xs font-medium text-text-secondary transition-all hover:border-border-hover hover:bg-[rgba(255,45,123,0.06)]">
-            <RefreshCw className="h-3.5 w-3.5" />
-            Sync All
+        <div className="flex items-center gap-3">
+          <div className="relative group">
+            {serverUp ? (
+              <CheckCircle className="h-4.5 w-4.5 text-neon-green" />
+            ) : (
+              <XCircle className="h-4.5 w-4.5 text-red-400" />
+            )}
+            <div className="pointer-events-none absolute right-0 top-full z-50 mt-2 whitespace-nowrap rounded-lg border border-border bg-popover px-3 py-1.5 text-[11px] text-popover-foreground opacity-0 shadow-lg transition-opacity group-hover:opacity-100">
+              {serverUp ? "Server connected" : "Server offline"}
+            </div>
+          </div>
+          <button
+            onClick={handleSyncAll}
+            disabled={syncing}
+            className={cn(
+              "flex items-center gap-1.5 rounded-lg border border-border bg-transparent px-3.5 py-[7px] text-xs font-medium text-text-secondary transition-all hover:border-border-hover hover:bg-[rgba(255,45,123,0.06)]",
+              syncing && "pointer-events-none opacity-60"
+            )}
+          >
+            <RefreshCw className={cn("h-3.5 w-3.5", syncing && "animate-spin")} />
+            {syncing ? "Syncing…" : "Sync All"}
           </button>
         </div>
       </div>

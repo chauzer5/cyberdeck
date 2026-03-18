@@ -73,6 +73,17 @@ export const settings = sqliteTable("settings", {
   updatedAt: text("updated_at").notNull(),
 });
 
+export const notifications = sqliteTable("notifications", {
+  id: text("id").primaryKey(),
+  type: text("type", { enum: ["slack_unread", "mr_pipeline", "mr_approval", "todo_created"] }).notNull(),
+  title: text("title").notNull(),
+  detail: text("detail"),
+  url: text("url"),
+  read: integer("read", { mode: "boolean" }).notNull().default(false),
+  meta: text("meta"),
+  createdAt: text("created_at").notNull(),
+});
+
 export const todos = sqliteTable("todos", {
   id: text("id").primaryKey(),
   source: text("source").notNull(),

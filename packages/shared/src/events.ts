@@ -9,6 +9,7 @@ export type WSEvent =
   | { type: "integration:sync"; integrationId: string }
   | { type: "slack:summary"; channelId: string; summaryId: string }
   | { type: "slack:unread"; unreadCount: number }
+  | { type: "notification:new"; notificationId: string }
   | { type: "ping" };
 
 export type WSCommand =

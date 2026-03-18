@@ -5,9 +5,9 @@ import { cn } from "@/lib/utils";
 
 const STAT_CONFIGS = [
   {
-    key: "todos",
-    label: "Todos",
-    color: "pink" as const,
+    key: "prs",
+    label: "Open PRs",
+    color: "purple" as const,
   },
   {
     key: "unread",
@@ -18,11 +18,6 @@ const STAT_CONFIGS = [
     key: "agents",
     label: "Agents",
     color: "yellow" as const,
-  },
-  {
-    key: "server",
-    label: "Server",
-    color: "green" as const,
   },
 ] as const;
 
@@ -51,20 +46,23 @@ const COLOR_MAP = {
     barBg: "bg-neon-green shadow-[0_0_8px_rgba(0,255,136,0.6)]",
     edge: "from-neon-green",
   },
+  purple: {
+    value: "text-neon-purple",
+    glow: "0 0 30px rgba(192, 38, 211, 0.4)",
+    barBg: "bg-neon-purple shadow-[0_0_8px_rgba(192,38,211,0.6)]",
+    edge: "from-neon-purple",
+  },
 } as const;
 
 export function QuickStatsPanel() {
-  const ping = trpc.health.ping.useQuery(undefined, {
-    refetchInterval: 30_000,
-  });
-  const todosQuery = trpc.todos.list.useQuery(undefined, {
-    refetchInterval: 15_000,
-  });
   const unreadQuery = trpc.slack.unreadDms.useQuery(undefined, {
-    refetchInterval: 120_000,
+    refetchInterval: 30_000,
   });
   const agentsQuery = trpc.agents.list.useQuery(undefined, {
     refetchInterval: 5_000,
+  });
+  const prsQuery = trpc.sourceControl.pullRequests.useQuery(undefined, {
+    refetchInterval: 30_000,
   });
 
   const utils = trpc.useUtils();
@@ -79,20 +77,21 @@ export function QuickStatsPanel() {
     ),
   );
 
-  const todoCount = todosQuery.data?.length ?? 0;
+  const myPRs = prsQuery.data?.filter((pr) => pr.is_mine) ?? [];
+  const myPRCount = myPRs.length;
+  const needsReview = prsQuery.data?.filter((pr) => pr.needs_your_review).length ?? 0;
   const unreadCount = unreadQuery.data?.checkedAt
     ? unreadQuery.data.unreadCount
     : null;
   const runningAgents = agentsQuery.data?.filter((a) => a.status === "running").length ?? 0;
   const totalAgents = agentsQuery.data?.length ?? 0;
-  const serverUp = !!ping.data;
 
   const stats: { value: string; delta?: string; deltaUp?: boolean; barPercent: number }[] = [
     {
-      value: String(todoCount),
-      delta: todoCount > 0 ? `${todoCount} active` : undefined,
-      deltaUp: todoCount > 0,
-      barPercent: Math.min(todoCount * 10, 100),
+      value: String(myPRCount),
+      delta: needsReview > 0 ? `${needsReview} need review` : undefined,
+      deltaUp: needsReview > 0,
+      barPercent: Math.min(myPRCount * 15, 100),
     },
     {
       value: unreadCount != null ? String(unreadCount) : "--",
@@ -105,12 +104,6 @@ export function QuickStatsPanel() {
       delta: totalAgents > 0 ? `${totalAgents} total` : undefined,
       deltaUp: runningAgents > 0,
       barPercent: totalAgents > 0 ? Math.round((runningAgents / totalAgents) * 100) : 0,
-    },
-    {
-      value: serverUp ? "ON" : "OFF",
-      delta: serverUp ? "connected" : "offline",
-      deltaUp: serverUp,
-      barPercent: serverUp ? 100 : 0,
     },
   ];
 

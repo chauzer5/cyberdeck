@@ -5,6 +5,8 @@ import { slackRouter } from "./slack/router.js";
 import { settingsRouter } from "./settings/router.js";
 import { sourceControlRouter } from "./integrations/source-control/router.js";
 import { linearRouter } from "./integrations/linear/router.js";
+import { teamRouter } from "./team/router.js";
+import { notificationsRouter } from "./notifications/router.js";
 
 export const appRouter = router({
   health: router({
@@ -18,6 +20,8 @@ export const appRouter = router({
   settings: settingsRouter,
   sourceControl: sourceControlRouter,
   linear: linearRouter,
+  team: teamRouter,
+  notifications: notificationsRouter,
 });
 
 export type AppRouter = typeof appRouter;

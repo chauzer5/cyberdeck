@@ -77,6 +77,7 @@ function SlackPage() {
           context: input.context ?? null,
           lastPolledAt: null,
           teamId: input.teamId ?? null,
+          sortOrder: null,
           createdAt: new Date().toISOString(),
         },
       ]);
@@ -219,7 +220,7 @@ function SlackPage() {
             className="flex items-center gap-1.5 rounded-lg border border-border bg-transparent px-3.5 py-[7px] text-xs font-medium text-text-secondary transition-all hover:border-border-hover hover:bg-[rgba(255,45,123,0.06)] disabled:opacity-50"
           >
             <RefreshCw className={cn("h-3.5 w-3.5", pollNow.isPending && "animate-spin")} />
-            Poll Now
+            Sync
           </button>
         </div>
       </div>
@@ -678,7 +679,7 @@ function SlackPage() {
                         No conversations yet for this channel
                       </p>
                       <p className="mt-1 text-xs text-text-muted">
-                        Click "Poll Now" to fetch the latest activity
+                        Click "Sync" to fetch the latest activity
                       </p>
                     </div>
                   </div>

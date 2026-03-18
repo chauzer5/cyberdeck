@@ -10,6 +10,7 @@ import {
   generateDayHeadline,
 } from "./summarizer.js";
 import { broadcast } from "../ws/events.js";
+import { createNotification } from "../notifications/create.js";
 
 let intervalId: ReturnType<typeof setInterval> | null = null;
 
@@ -233,8 +234,9 @@ async function pollChannel(channel: typeof slackChannels.$inferSelect) {
           ? `slack://channel?team=${channel.teamId}&id=${channel.slackChannelId}${todo.messageTs ? `&message=${todo.messageTs}` : ""}`
           : `slack://channel?id=${channel.slackChannelId}${todo.messageTs ? `&message=${todo.messageTs}` : ""}`;
 
+        const todoId = crypto.randomUUID();
         await db.insert(todos).values({
-          id: crypto.randomUUID(),
+          id: todoId,
           source: "slack",
           title: todo.title,
           description: todo.description,
@@ -243,6 +245,13 @@ async function pollChannel(channel: typeof slackChannels.$inferSelect) {
           completed: false,
           createdAt: now,
           updatedAt: now,
+        });
+        await createNotification({
+          type: "todo_created",
+          title: "New todo from Slack",
+          detail: todo.title,
+          url,
+          meta: { todoId, channelName: channel.name },
         });
       }
     }

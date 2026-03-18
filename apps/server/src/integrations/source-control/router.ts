@@ -41,6 +41,7 @@ export interface UnifiedPR {
   web_url: string;
   updated_at: string;
   check_status: string | null;
+  approved: boolean;
   has_conflicts: boolean;
   is_mine: boolean;
   is_team_member: boolean;
@@ -63,6 +64,7 @@ function gitlabToUnified(mr: EnrichedMergeRequest): UnifiedPR {
     web_url: mr.web_url,
     updated_at: mr.updated_at,
     check_status: mr.pipeline_status,
+    approved: mr.approved,
     has_conflicts: mr.has_conflicts,
     is_mine: mr.is_mine,
     is_team_member: mr.is_team_member,
@@ -86,6 +88,7 @@ function githubToUnified(pr: EnrichedPullRequest): UnifiedPR {
     web_url: pr.web_url,
     updated_at: pr.updated_at,
     check_status: pr.check_status,
+    approved: pr.approved,
     has_conflicts: pr.has_conflicts,
     is_mine: pr.is_mine,
     is_team_member: pr.is_team_member,
