@@ -12,10 +12,12 @@ import {
   ToggleRight,
   AlertCircle,
   X,
+  Palette,
 } from "lucide-react";
 import { trpc } from "@/trpc";
 import { cn } from "@/lib/utils";
 import { useSlackEnabled } from "@/hooks/useSlackEnabled";
+import { useTheme, type Theme } from "@/hooks/useTheme";
 
 // ── Credential Row ──
 
@@ -28,7 +30,7 @@ function CredentialRow({
   label: string;
   settingKey: string;
   placeholder: string;
-  testMutation?: ReturnType<typeof trpc.gitlab.testConnection.useMutation> | ReturnType<typeof trpc.linear.testConnection.useMutation>;
+  testMutation?: ReturnType<typeof trpc.sourceControl.testGitLab.useMutation> | ReturnType<typeof trpc.sourceControl.testGitHub.useMutation> | ReturnType<typeof trpc.linear.testConnection.useMutation>;
 }) {
   const [editing, setEditing] = useState(false);
   const [value, setValue] = useState("");
@@ -152,7 +154,9 @@ function SettingsPage() {
     },
   });
 
-  const testGitlab = trpc.gitlab.testConnection.useMutation();
+  const { theme, setTheme } = useTheme();
+  const testGitLab = trpc.sourceControl.testGitLab.useMutation();
+  const testGitHub = trpc.sourceControl.testGitHub.useMutation();
   const testLinear = trpc.linear.testConnection.useMutation();
 
   useEffect(() => {
@@ -181,8 +185,58 @@ function SettingsPage() {
       {/* Content */}
       <div className="flex-1 overflow-y-auto">
         <div className="mx-auto max-w-2xl space-y-6 p-6">
+          {/* Theme section */}
+          <section className="rounded-xl border border-border bg-card">
+            <div className="flex items-center gap-2.5 border-b border-border px-5 py-3.5">
+              <Palette className="h-4 w-4 text-neon-pink" />
+              <h2 className="text-sm font-semibold text-cream">Theme</h2>
+            </div>
+            <div className="grid grid-cols-3 gap-3 p-5">
+              {([
+                {
+                  key: "prismatic" as Theme,
+                  label: "Prismatic",
+                  desc: "Rainbow spectral, clean, iridescent",
+                  preview: "bg-gradient-to-br from-[#a78bfa] via-[#67e8f9] to-[#c084fc]",
+                },
+                {
+                  key: "cyberpunk" as Theme,
+                  label: "Cyberpunk",
+                  desc: "Neon pink, scanlines, grid floor",
+                  preview: "bg-gradient-to-br from-[#ff2d7b] via-[#c026d3] to-[#00f0ff]",
+                },
+                {
+                  key: "deep-space" as Theme,
+                  label: "Deep Space",
+                  desc: "Cool navy, starfield, minimal glow",
+                  preview: "bg-gradient-to-br from-[#60a5fa] via-[#1e3a5f] to-[#22d3ee]",
+                },
+              ]).map((t) => (
+                <button
+                  key={t.key}
+                  onClick={() => setTheme(t.key)}
+                  className={cn(
+                    "group relative rounded-lg border p-3 text-left transition-all",
+                    theme === t.key
+                      ? "border-neon-pink bg-[rgba(var(--color-primary),0.08)] shadow-[inset_0_0_0_1px_var(--color-neon-pink)]"
+                      : "border-border hover:border-border-hover",
+                  )}
+                >
+                  <div className={cn("mb-2.5 h-10 rounded-md", t.preview)} />
+                  <div className="text-xs font-semibold text-cream">{t.label}</div>
+                  <div className="mt-0.5 text-[10px] text-text-muted leading-snug">{t.desc}</div>
+                  {theme === t.key && (
+                    <div className="absolute top-2 right-2">
+                      <Check className="h-3.5 w-3.5 text-neon-pink" />
+                    </div>
+                  )}
+                </button>
+              ))}
+            </div>
+          </section>
+
           {/* GitLab section */}
-          <section className="rounded-xl border border-border bg-[rgba(255,45,123,0.02)]">
+          <section className="rounded-xl border border-border bg-card">
             <div className="flex items-center gap-2.5 border-b border-border px-5 py-3.5">
               <GitMerge className="h-4 w-4 text-neon-pink" />
               <h2 className="text-sm font-semibold text-cream">GitLab</h2>
@@ -192,7 +246,7 @@ function SettingsPage() {
                 label="Personal Access Token"
                 settingKey="gitlab.pat"
                 placeholder="glpat-xxxxxxxxxxxxxxxxxxxx"
-                testMutation={testGitlab}
+                testMutation={testGitLab}
               />
               <CredentialRow
                 label="Group ID"
@@ -202,8 +256,29 @@ function SettingsPage() {
             </div>
           </section>
 
+          {/* GitHub section */}
+          <section className="rounded-xl border border-border bg-card">
+            <div className="flex items-center gap-2.5 border-b border-border px-5 py-3.5">
+              <GitMerge className="h-4 w-4 text-neon-pink" />
+              <h2 className="text-sm font-semibold text-cream">GitHub</h2>
+            </div>
+            <div className="space-y-5 p-5">
+              <CredentialRow
+                label="Access Token"
+                settingKey="github.token"
+                placeholder="ghp_xxxxxxxxxxxxxxxxxxxx"
+                testMutation={testGitHub}
+              />
+              <CredentialRow
+                label="Organization"
+                settingKey="github.org"
+                placeholder="my-org"
+              />
+            </div>
+          </section>
+
           {/* Linear section */}
-          <section className="rounded-xl border border-border bg-[rgba(255,45,123,0.02)]">
+          <section className="rounded-xl border border-border bg-card">
             <div className="flex items-center gap-2.5 border-b border-border px-5 py-3.5">
               <LayoutList className="h-4 w-4 text-neon-pink" />
               <h2 className="text-sm font-semibold text-cream">Linear</h2>
@@ -224,7 +299,7 @@ function SettingsPage() {
           </section>
 
           {/* Slack section */}
-          <section className="rounded-xl border border-border bg-[rgba(255,45,123,0.02)]">
+          <section className="rounded-xl border border-border bg-card">
             <div className="flex items-center gap-2.5 border-b border-border px-5 py-3.5">
               <MessageSquare className="h-4 w-4 text-neon-pink" />
               <h2 className="text-sm font-semibold text-cream">Slack</h2>

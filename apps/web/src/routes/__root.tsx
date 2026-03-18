@@ -1,5 +1,6 @@
 import { createRootRoute, Outlet } from "@tanstack/react-router";
 import { Sidebar } from "@/components/layout/Sidebar";
+import { useTheme } from "@/hooks/useTheme";
 
 const PARTICLES = [
   { left: "15%", duration: "18s", delay: "0s" },
@@ -13,26 +14,35 @@ const PARTICLES = [
 ];
 
 function RootLayout() {
+  const { theme } = useTheme();
+
   return (
     <div className="flex h-screen overflow-hidden">
-      {/* CRT Scanlines */}
-      <div className="scanlines" />
-      {/* Perspective grid floor */}
-      <div className="grid-floor" />
+      {/* Cyberpunk overlays */}
+      {theme === "cyberpunk" && (
+        <>
+          <div className="scanlines" />
+          <div className="grid-floor" />
+          <div className="pointer-events-none fixed inset-0 z-0 overflow-hidden">
+            {PARTICLES.map((p, i) => (
+              <div
+                key={i}
+                className="absolute h-1 w-1 rounded-full bg-neon-pink opacity-0 shadow-[0_0_6px_rgba(255,45,123,0.8)]"
+                style={{
+                  left: p.left,
+                  animation: `float-up ${p.duration} linear ${p.delay} infinite`,
+                }}
+              />
+            ))}
+          </div>
+        </>
+      )}
 
-      {/* Floating particles */}
-      <div className="pointer-events-none fixed inset-0 z-0 overflow-hidden">
-        {PARTICLES.map((p, i) => (
-          <div
-            key={i}
-            className="absolute h-1 w-1 rounded-full bg-neon-pink opacity-0 shadow-[0_0_6px_rgba(255,45,123,0.8)]"
-            style={{
-              left: p.left,
-              animation: `float-up ${p.duration} linear ${p.delay} infinite`,
-            }}
-          />
-        ))}
-      </div>
+      {/* Prismatic overlay */}
+      {theme === "prismatic" && <div className="prismatic-shimmer" />}
+
+      {/* Deep Space overlay */}
+      {theme === "deep-space" && <div className="starfield" />}
 
       <Sidebar />
       <main className="relative z-[1] flex-1 overflow-auto">

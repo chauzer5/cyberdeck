@@ -3,7 +3,7 @@ import { todosRouter } from "./todos/router.js";
 import { agentsRouter } from "./agents/router.js";
 import { slackRouter } from "./slack/router.js";
 import { settingsRouter } from "./settings/router.js";
-import { gitlabRouter } from "./integrations/gitlab/router.js";
+import { sourceControlRouter } from "./integrations/source-control/router.js";
 import { linearRouter } from "./integrations/linear/router.js";
 
 export const appRouter = router({
@@ -16,7 +16,7 @@ export const appRouter = router({
   agents: agentsRouter,
   slack: slackRouter,
   settings: settingsRouter,
-  gitlab: gitlabRouter,
+  sourceControl: sourceControlRouter,
   linear: linearRouter,
 });
 

@@ -13,8 +13,7 @@ import {
   Settings,
   PanelLeftClose,
   PanelLeft,
-  Cpu,
-  Sprout,
+  User,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Link, useRouterState } from "@tanstack/react-router";
@@ -29,6 +28,8 @@ export function Sidebar() {
 
   const todosQuery = trpc.todos.listAll.useQuery(undefined, { refetchInterval: 30_000 });
   const activeTodoCount = todosQuery.data?.counts.active ?? 0;
+  const whoami = trpc.settings.whoami.useQuery(undefined, { refetchOnWindowFocus: false, staleTime: 300_000 });
+  const userName = whoami.data ?? "...";
 
   const navSections = [
     {
@@ -41,7 +42,7 @@ export function Sidebar() {
       label: "Work",
       items: [
         { icon: CheckSquare, label: "Todos", href: "/todos", count: activeTodoCount > 0 ? activeTodoCount : undefined },
-        { icon: GitMerge, label: "GitLab", href: "/gitlab" },
+        { icon: GitMerge, label: "Source Control", href: "/source-control" },
         { icon: LayoutList, label: "Linear", href: "/linear" },
         ...(slackEnabled ? [{ icon: MessageSquare, label: "Slack", href: "/slack" } as const] : []),
         { icon: Monitor, label: "Agents", href: "/agents" },
@@ -66,18 +67,11 @@ export function Sidebar() {
       )}
     >
       {/* Brand */}
-      <div className="flex h-14 items-center gap-2.5 px-3">
+      <div className="flex h-14 items-center gap-2.5 px-3 bg-black">
         {sidebarOpen && (
-          <div className="flex items-center gap-2.5 px-1">
-            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-neon-pink-dark to-neon-pink shadow-[0_2px_8px_rgba(255,45,123,0.3),inset_0_1px_0_rgba(255,255,255,0.1)]">
-              <Cpu className="h-4 w-4 text-neon-pink-bright" />
-            </div>
-            <span className="font-display text-[13px] font-bold tracking-[3px] uppercase text-neon-pink" style={{ textShadow: "0 0 12px rgba(255, 45, 123, 0.6), 0 0 4px rgba(255, 45, 123, 0.3)" }}>
-              PRISM
-            </span>
-          </div>
+          <img src="/prism-logo.png" alt="PRISM" className="h-8 object-contain" />
         )}
-        <div className={cn("ml-auto", !sidebarOpen && "mx-auto")}>
+        <div className={cn("ml-auto", !sidebarOpen && "ml-0")}>
           <Button
             variant="ghost"
             size="icon"
@@ -177,17 +171,17 @@ export function Sidebar() {
         {sidebarOpen ? (
           <div className="flex items-center gap-2.5">
             <div className="flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-br from-neon-pink-dark to-neon-pink">
-              <Sprout className="h-4 w-4 text-neon-pink-bright" />
+              <User className="h-4 w-4 text-neon-pink-bright" />
             </div>
             <div>
-              <div className="text-xs font-medium text-text-primary">Aaron</div>
+              <div className="text-xs font-medium text-text-primary">{userName}</div>
               <div className="text-[11px] text-text-muted">local session</div>
             </div>
           </div>
         ) : (
           <div className="flex justify-center">
             <div className="flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-br from-neon-pink-dark to-neon-pink">
-              <Sprout className="h-4 w-4 text-neon-pink-bright" />
+              <User className="h-4 w-4 text-neon-pink-bright" />
             </div>
           </div>
         )}
