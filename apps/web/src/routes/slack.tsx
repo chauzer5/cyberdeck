@@ -1,7 +1,7 @@
 import { createRoute, useNavigate } from "@tanstack/react-router";
 import { rootRoute } from "./__root";
 import { useState, useCallback, useEffect, useRef } from "react";
-import { MessageSquare, Plus, Trash2, RefreshCw, ToggleLeft, ToggleRight, Shield, Pencil, Check, Loader2, ExternalLink, GripVertical } from "lucide-react";
+import { MessageSquare, Plus, Trash2, RefreshCw, ToggleLeft, ToggleRight, Shield, Pencil, Check, Loader2, ExternalLink, User } from "lucide-react";
 import { trpc } from "@/trpc";
 import { useWebSocket } from "@/hooks/useWebSocket";
 import { cn } from "@/lib/utils";
@@ -43,6 +43,9 @@ function SlackPage() {
         utils.slack.conversations.latest.invalidate();
         utils.slack.channels.list.invalidate();
       }
+      if (event.type === "slack:unread") {
+        utils.slack.unreadDmDetails.invalidate();
+      }
     },
     [utils]
   );
@@ -54,6 +57,7 @@ function SlackPage() {
   });
 
   const channels = trpc.slack.channels.list.useQuery();
+  const unreadDms = trpc.slack.unreadDmDetails.useQuery(undefined, { refetchInterval: 30_000 });
   const conversationsByDay = trpc.slack.conversations.byDay.useQuery(
     { channelId: selectedChannelId! },
     { enabled: !!selectedChannelId }
@@ -128,52 +132,7 @@ function SlackPage() {
     },
   });
 
-  const reorderChannels = trpc.slack.channels.reorder.useMutation({
-    onSuccess: () => utils.slack.channels.list.invalidate(),
-  });
 
-  // Drag-and-drop state
-  const [draggedId, setDraggedId] = useState<string | null>(null);
-  const [dragOverId, setDragOverId] = useState<string | null>(null);
-
-  const handleDragStart = useCallback((id: string) => {
-    setDraggedId(id);
-  }, []);
-
-  const handleDragOver = useCallback((e: React.DragEvent, id: string) => {
-    e.preventDefault();
-    if (id !== draggedId) setDragOverId(id);
-  }, [draggedId]);
-
-  const handleDrop = useCallback((e: React.DragEvent, targetId: string) => {
-    e.preventDefault();
-    if (!draggedId || draggedId === targetId || !channels.data) return;
-
-    const list = [...channels.data];
-    const fromIdx = list.findIndex((c) => c.id === draggedId);
-    const toIdx = list.findIndex((c) => c.id === targetId);
-    if (fromIdx === -1 || toIdx === -1) return;
-
-    const reordered = [...list];
-    const [moved] = reordered.splice(fromIdx, 1);
-    reordered.splice(toIdx, 0, moved);
-
-    // Optimistic update
-    utils.slack.channels.list.setData(undefined, reordered);
-
-    // Persist new order
-    reorderChannels.mutate(
-      reordered.map((c, i) => ({ id: c.id, sortOrder: i }))
-    );
-
-    setDraggedId(null);
-    setDragOverId(null);
-  }, [draggedId, channels.data, utils, reorderChannels]);
-
-  const handleDragEnd = useCallback(() => {
-    setDraggedId(null);
-    setDragOverId(null);
-  }, []);
 
   const selectedChannel = channels.data?.find((c) => c.id === selectedChannelId);
 
@@ -226,8 +185,58 @@ function SlackPage() {
       </div>
 
       <div className="flex flex-1 overflow-hidden">
-        {/* Left panel — channel list */}
+        {/* Left panel — DMs + channel list */}
         <div className="flex w-72 shrink-0 flex-col border-r border-border">
+          {/* Unread DMs section */}
+          <div className="border-b border-border px-4 py-3">
+            <div className="flex items-center gap-2">
+              <div className="text-xs font-semibold uppercase tracking-widest text-text-muted">
+                Direct Messages
+              </div>
+              {(unreadDms.data?.length ?? 0) > 0 && (
+                <span className="rounded-full bg-[rgba(255,45,123,0.12)] px-1.5 py-0.5 text-[10px] font-semibold text-neon-pink">
+                  {unreadDms.data!.length}
+                </span>
+              )}
+            </div>
+          </div>
+          <div className="space-y-0.5 border-b border-border p-2">
+            {(unreadDms.data?.length ?? 0) === 0 && (
+              <p className="px-3 py-2 text-[11px] text-text-muted">No unread messages</p>
+            )}
+            {unreadDms.data?.map((dm) => {
+              const deepLink = dm.teamId
+                ? `slack://user?team=${dm.teamId}&id=${dm.userId}`
+                : `slack://user?id=${dm.userId}`;
+              return (
+                <a
+                  key={dm.channelId}
+                  href={deepLink}
+                  className="flex items-start gap-2.5 rounded-lg px-3 py-2 transition-all hover:bg-[rgba(255,45,123,0.04)]"
+                >
+                  <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-neon-cyan/20 to-neon-pink/20 mt-0.5">
+                    <User className="h-3 w-3 text-neon-cyan" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-xs font-semibold text-cream truncate">{dm.userName}</span>
+                      <span className="shrink-0 rounded-full bg-[rgba(0,240,255,0.12)] px-1.5 py-0.5 text-[9px] font-semibold text-neon-cyan">
+                        {dm.unreadCount}
+                      </span>
+                    </div>
+                    {dm.latestText && (
+                      <p className="mt-0.5 truncate text-[11px] text-text-muted">
+                        {dm.latestText}
+                      </p>
+                    )}
+                  </div>
+                  <ExternalLink className="mt-1 h-3 w-3 shrink-0 text-text-muted opacity-0 transition-opacity group-hover:opacity-100" />
+                </a>
+              );
+            })}
+          </div>
+
+          {/* Channels section */}
           <div className="border-b border-border px-4 py-3">
             <div className="text-xs font-semibold uppercase tracking-widest text-text-muted">
               Channels
@@ -236,37 +245,22 @@ function SlackPage() {
           <div className="flex-1 space-y-1 overflow-y-auto p-2">
             {channels.data?.map((channel, i) => {
               const isTemp = channel.id.startsWith("temp-");
-              const isDragging = draggedId === channel.id;
-              const isOver = dragOverId === channel.id;
               return (
               <div
                 key={channel.id}
-                draggable={!isTemp}
-                onDragStart={() => handleDragStart(channel.id)}
-                onDragOver={(e) => handleDragOver(e, channel.id)}
-                onDrop={(e) => handleDrop(e, channel.id)}
-                onDragEnd={handleDragEnd}
+                onClick={() => {
+                  if (!isTemp) navigate({ to: "/slack", search: { channel: channel.id } });
+                }}
                 className={cn(
-                  "animate-glass-in group flex items-center gap-2 rounded-lg px-3 py-2.5 transition-all",
+                  "animate-glass-in group flex cursor-pointer items-center gap-2 rounded-lg px-3 py-2.5 transition-all",
                   `stagger-${Math.min(i + 1, 5)}`,
                   (isTemp || !channel.enabled) && "opacity-40",
-                  isDragging && "opacity-50 ring-1 ring-neon-pink/30",
-                  isOver && "ring-1 ring-neon-pink/50 bg-[rgba(255,45,123,0.06)]",
                   selectedChannelId === channel.id
                     ? "bg-sidebar-accent text-cream shadow-[inset_0_0_0_1px_rgba(255,45,123,0.12)]"
                     : "text-text-secondary hover:bg-[rgba(255,45,123,0.04)]"
                 )}
               >
-                {!isTemp && (
-                  <GripVertical className="h-3.5 w-3.5 shrink-0 cursor-grab text-text-muted opacity-0 transition-opacity group-hover:opacity-40 active:cursor-grabbing" />
-                )}
-                <button
-                  onClick={() =>
-                    !isTemp && navigate({ to: "/slack", search: { channel: channel.id } })
-                  }
-                  disabled={isTemp}
-                  className="flex min-w-0 flex-1 items-center gap-2 text-left"
-                >
+                <div className="flex min-w-0 flex-1 items-center gap-2 text-left">
                   {isTemp ? (
                     <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-neon-pink opacity-60" />
                   ) : (
@@ -278,16 +272,17 @@ function SlackPage() {
                       {channel.focus}
                     </div>
                   </div>
-                </button>
+                </div>
                 {!isTemp && (
                 <div className="flex shrink-0 items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
                   <button
-                    onClick={() =>
+                    onClick={(e) => {
+                      e.stopPropagation();
                       updateChannel.mutate({
                         id: channel.id,
                         enabled: !channel.enabled,
-                      })
-                    }
+                      });
+                    }}
                     className="rounded p-1 text-text-muted hover:text-cream"
                     title={channel.enabled ? "Disable" : "Enable"}
                   >
@@ -298,7 +293,10 @@ function SlackPage() {
                     )}
                   </button>
                   <button
-                    onClick={() => removeChannel.mutate({ id: channel.id })}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      removeChannel.mutate({ id: channel.id });
+                    }}
                     className="rounded p-1 text-text-muted hover:text-red-400"
                     title="Remove"
                   >
@@ -409,7 +407,7 @@ function SlackPage() {
                         todoFocus: todoFocus || undefined,
                       })
                     }
-                    disabled={!channelName.trim() || !focus.trim() || addChannel.isPending}
+                    disabled={!channelName.trim() || addChannel.isPending}
                     className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-neon-pink-dark px-3 py-1.5 text-xs font-medium text-neon-pink-bright transition-all hover:bg-neon-pink disabled:opacity-50"
                   >
                     <Plus className="h-3.5 w-3.5" />
@@ -541,7 +539,7 @@ function SlackPage() {
                         setTimeout(() => focusInputRef.current?.focus(), 0);
                       }}
                     >
-                      <span>{selectedChannel.focus}</span>
+                      <span className={selectedChannel.focus ? "" : "text-text-muted italic"}>{selectedChannel.focus || "none"}</span>
                       <Pencil className="h-2.5 w-2.5 text-text-muted opacity-0 transition-opacity group-hover:opacity-100" />
                     </button>
                   )}

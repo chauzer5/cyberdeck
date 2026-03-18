@@ -6,7 +6,18 @@ const WS_URL = `${window.location.protocol === "https:" ? "wss:" : "ws:"}//${win
 // ── Singleton WebSocket connection ──────────────────────────────────
 let ws: WebSocket | null = null;
 let reconnectTimer: ReturnType<typeof setTimeout> | undefined;
+let staleTimer: ReturnType<typeof setTimeout> | undefined;
 const listeners = new Set<(event: WSEvent) => void>();
+
+const STALE_TIMEOUT = 30_000; // If no ping in 30s, connection is stale
+
+function resetStaleTimer() {
+  clearTimeout(staleTimer);
+  staleTimer = setTimeout(() => {
+    console.log("[ws] connection stale (no ping in 30s), reconnecting...");
+    ws?.close();
+  }, STALE_TIMEOUT);
+}
 
 function ensureConnection() {
   if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) {
@@ -17,6 +28,7 @@ function ensureConnection() {
 
   ws.onopen = () => {
     console.log("[ws] connected");
+    resetStaleTimer();
   };
 
   ws.onmessage = (msg) => {
@@ -24,6 +36,7 @@ function ensureConnection() {
       const event: WSEvent = JSON.parse(msg.data);
       if (event.type === "ping") {
         ws?.send(JSON.stringify({ type: "pong" }));
+        resetStaleTimer();
         return;
       }
       for (const listener of listeners) {
@@ -37,10 +50,21 @@ function ensureConnection() {
   ws.onclose = () => {
     console.log("[ws] disconnected, reconnecting in 3s...");
     ws = null;
+    clearTimeout(staleTimer);
     clearTimeout(reconnectTimer);
     reconnectTimer = setTimeout(ensureConnection, 3000);
   };
 }
+
+// Reconnect immediately when the page becomes visible again
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible") {
+    if (!ws || ws.readyState !== WebSocket.OPEN) {
+      clearTimeout(reconnectTimer);
+      ensureConnection();
+    }
+  }
+});
 
 function sendCommand(command: WSCommand) {
   ws?.send(JSON.stringify(command));

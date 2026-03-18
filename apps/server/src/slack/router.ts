@@ -5,7 +5,7 @@ import { db } from "../db/index.js";
 import { slackChannels, slackSummaries, slackConversations, slackDayHeadlines } from "../db/schema.js";
 import { resolveChannelId, getAuthStatus, resetSlackClients } from "./client.js";
 import { pollAllChannels, pollSingleChannel } from "./poller.js";
-import { getUnreadDmStats } from "./dm-poller.js";
+import { getUnreadDmStats, getUnreadDmDetails } from "./dm-poller.js";
 
 export const slackRouter = router({
   auth: router({
@@ -49,7 +49,7 @@ export const slackRouter = router({
         z.object({
           name: z.string().min(1),
           slackChannelId: z.string().optional(),
-          focus: z.string().min(1),
+          focus: z.string().default(""),
           ignore: z.string().optional(),
           teamId: z.string().optional(),
           todosEnabled: z.boolean().optional(),
@@ -248,6 +248,10 @@ export const slackRouter = router({
 
   unreadDms: publicProcedure.query(() => {
     return getUnreadDmStats();
+  }),
+
+  unreadDmDetails: publicProcedure.query(() => {
+    return getUnreadDmDetails();
   }),
 
   pollNow: publicProcedure.mutation(() => {

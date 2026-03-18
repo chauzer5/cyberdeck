@@ -1,5 +1,10 @@
 import type { WSContext } from "hono/ws";
-import { addClient, removeClient, handleCommand } from "./events.js";
+import { addClient, removeClient, handleCommand, broadcast } from "./events.js";
+
+// Send a ping to all clients every 15 seconds
+setInterval(() => {
+  broadcast({ type: "ping" });
+}, 15_000);
 
 export function onOpen(ws: WSContext) {
   console.log("[ws] client connected");

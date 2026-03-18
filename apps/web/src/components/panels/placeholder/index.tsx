@@ -1,4 +1,5 @@
 import { useCallback } from "react";
+import { Link } from "@tanstack/react-router";
 import { trpc } from "@/trpc";
 import { useWebSocket } from "@/hooks/useWebSocket";
 import { cn } from "@/lib/utils";
@@ -8,16 +9,19 @@ const STAT_CONFIGS = [
     key: "prs",
     label: "Open PRs",
     color: "purple" as const,
+    href: "/source-control",
   },
   {
     key: "unread",
     label: "Unread DMs",
     color: "cyan" as const,
+    href: "/slack",
   },
   {
     key: "agents",
     label: "Agents",
     color: "yellow" as const,
+    href: "/agents",
   },
 ] as const;
 
@@ -114,8 +118,9 @@ export function QuickStatsPanel() {
         const colors = COLOR_MAP[cfg.color];
 
         return (
-          <div
+          <Link
             key={cfg.key}
+            to={cfg.href}
             className={cn(
               "animate-glass-in relative self-start overflow-hidden rounded-xl border border-[rgba(255,45,123,0.08)] bg-[rgba(30,22,55,0.7)] p-4 backdrop-blur-xl transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_8px_30px_rgba(0,0,0,0.4)]",
               `stagger-${i + 1}`
@@ -164,7 +169,7 @@ export function QuickStatsPanel() {
                 style={{ width: `${s.barPercent}%` }}
               />
             </div>
-          </div>
+          </Link>
         );
       })}
     </>

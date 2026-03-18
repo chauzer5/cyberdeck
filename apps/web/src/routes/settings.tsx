@@ -6,6 +6,8 @@ import {
   MessageSquare,
   GitMerge,
   LayoutList,
+  CheckSquare,
+  Bot,
   Check,
   Loader2,
   ToggleLeft,
@@ -159,6 +161,21 @@ function SettingsPage() {
   const testGitHub = trpc.sourceControl.testGitHub.useMutation();
   const testLinear = trpc.linear.testConnection.useMutation();
 
+  const utils = trpc.useUtils();
+  const scEnabled = trpc.settings.get.useQuery({ key: "sourceControl.enabled" });
+  const sourceControlEnabled = scEnabled.data !== "false";
+  const linearEnabled_ = trpc.settings.get.useQuery({ key: "linear.enabled" });
+  const linearEnabled = linearEnabled_.data !== "false";
+  const todosEnabled_ = trpc.settings.get.useQuery({ key: "todos.enabled" });
+  const todosEnabled = todosEnabled_.data !== "false";
+  const agentsEnabled_ = trpc.settings.get.useQuery({ key: "agents.enabled" });
+  const agentsEnabled = agentsEnabled_.data !== "false";
+  const toggleSetting = trpc.settings.set.useMutation({
+    onSuccess: () => {
+      utils.settings.get.invalidate();
+    },
+  });
+
   useEffect(() => {
     if (currentModel.data !== undefined) {
       setSlackModel(currentModel.data ?? "");
@@ -235,31 +252,60 @@ function SettingsPage() {
             </div>
           </section>
 
-          {/* GitLab section */}
+          {/* Todos section */}
+          <section className="rounded-xl border border-border bg-card">
+            <div className="flex items-center gap-2.5 px-5 py-3.5">
+              <CheckSquare className="h-4 w-4 text-neon-pink" />
+              <h2 className="text-sm font-semibold text-cream">Todos</h2>
+              <div className="ml-auto flex items-center gap-2">
+                <span className="text-xs text-text-muted">
+                  {todosEnabled ? "Enabled" : "Disabled"}
+                </span>
+                <button
+                  onClick={() => toggleSetting.mutate({ key: "todos.enabled", value: todosEnabled ? "false" : "true" })}
+                  className="flex items-center text-text-muted transition-colors hover:text-cream"
+                >
+                  {todosEnabled ? (
+                    <ToggleRight className="h-5 w-5 text-neon-pink" />
+                  ) : (
+                    <ToggleLeft className="h-5 w-5" />
+                  )}
+                </button>
+              </div>
+            </div>
+          </section>
+
+          {/* Source Control section */}
           <section className="rounded-xl border border-border bg-card">
             <div className="flex items-center gap-2.5 border-b border-border px-5 py-3.5">
               <GitMerge className="h-4 w-4 text-neon-pink" />
-              <h2 className="text-sm font-semibold text-cream">GitLab</h2>
+              <h2 className="text-sm font-semibold text-cream">Source Control</h2>
+              <div className="ml-auto flex items-center gap-2">
+                <span className="text-xs text-text-muted">
+                  {sourceControlEnabled ? "Enabled" : "Disabled"}
+                </span>
+                <button
+                  onClick={() => toggleSetting.mutate({ key: "sourceControl.enabled", value: sourceControlEnabled ? "false" : "true" })}
+                  className="flex items-center text-text-muted transition-colors hover:text-cream"
+                >
+                  {sourceControlEnabled ? (
+                    <ToggleRight className="h-5 w-5 text-neon-pink" />
+                  ) : (
+                    <ToggleLeft className="h-5 w-5" />
+                  )}
+                </button>
+              </div>
             </div>
             <div className="space-y-5 p-5">
               <CredentialRow
-                label="Personal Access Token"
+                label="GitLab Personal Access Token"
                 settingKey="gitlab.pat"
                 placeholder="glpat-xxxxxxxxxxxxxxxxxxxx"
                 testMutation={testGitLab}
               />
-            </div>
-          </section>
-
-          {/* GitHub section */}
-          <section className="rounded-xl border border-border bg-card">
-            <div className="flex items-center gap-2.5 border-b border-border px-5 py-3.5">
-              <GitMerge className="h-4 w-4 text-neon-pink" />
-              <h2 className="text-sm font-semibold text-cream">GitHub</h2>
-            </div>
-            <div className="space-y-5 p-5">
+              <div className="h-px bg-border" />
               <CredentialRow
-                label="Access Token"
+                label="GitHub Access Token"
                 settingKey="github.token"
                 placeholder="ghp_xxxxxxxxxxxxxxxxxxxx"
                 testMutation={testGitHub}
@@ -272,6 +318,21 @@ function SettingsPage() {
             <div className="flex items-center gap-2.5 border-b border-border px-5 py-3.5">
               <LayoutList className="h-4 w-4 text-neon-pink" />
               <h2 className="text-sm font-semibold text-cream">Linear</h2>
+              <div className="ml-auto flex items-center gap-2">
+                <span className="text-xs text-text-muted">
+                  {linearEnabled ? "Enabled" : "Disabled"}
+                </span>
+                <button
+                  onClick={() => toggleSetting.mutate({ key: "linear.enabled", value: linearEnabled ? "false" : "true" })}
+                  className="flex items-center text-text-muted transition-colors hover:text-cream"
+                >
+                  {linearEnabled ? (
+                    <ToggleRight className="h-5 w-5 text-neon-pink" />
+                  ) : (
+                    <ToggleLeft className="h-5 w-5" />
+                  )}
+                </button>
+              </div>
             </div>
             <div className="space-y-5 p-5">
               <CredentialRow
@@ -351,6 +412,29 @@ function SettingsPage() {
                     </optgroup>
                   ))}
                 </select>
+              </div>
+            </div>
+          </section>
+
+          {/* Agents section */}
+          <section className="rounded-xl border border-border bg-card">
+            <div className="flex items-center gap-2.5 px-5 py-3.5">
+              <Bot className="h-4 w-4 text-neon-pink" />
+              <h2 className="text-sm font-semibold text-cream">Agents</h2>
+              <div className="ml-auto flex items-center gap-2">
+                <span className="text-xs text-text-muted">
+                  {agentsEnabled ? "Enabled" : "Disabled"}
+                </span>
+                <button
+                  onClick={() => toggleSetting.mutate({ key: "agents.enabled", value: agentsEnabled ? "false" : "true" })}
+                  className="flex items-center text-text-muted transition-colors hover:text-cream"
+                >
+                  {agentsEnabled ? (
+                    <ToggleRight className="h-5 w-5 text-neon-pink" />
+                  ) : (
+                    <ToggleLeft className="h-5 w-5" />
+                  )}
+                </button>
               </div>
             </div>
           </section>

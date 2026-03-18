@@ -398,6 +398,112 @@ export async function fetchUnreadDmCount(): Promise<{
   return { unreadCount: total, checkedAt: new Date().toISOString() };
 }
 
+export interface UnreadDm {
+  channelId: string;
+  userId: string;
+  userName: string;
+  unreadCount: number;
+  latestText: string;
+  latestTs: string;
+  teamId: string | null;
+}
+
+export async function fetchUnreadDmDetails(): Promise<UnreadDm[]> {
+  const results: UnreadDm[] = [];
+
+  const attemptForTeam = async (teamId?: string | null) => {
+    const slack = getSlackClient(teamId);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const countsResult = await (slack as any).apiCall("users.counts", {
+      mpim_aware: true,
+      only_self_subteams: true,
+    });
+
+    const ims = (countsResult.ims ?? []) as Record<string, unknown>[];
+    const unreadIms = ims.filter((dm) => ((dm.dm_count as number) ?? 0) > 0);
+
+    // Fetch latest message + resolve user name for each unread DM (batch of 5)
+    const batchSize = 5;
+    for (let i = 0; i < unreadIms.length; i += batchSize) {
+      const batch = unreadIms.slice(i, i + batchSize);
+      const settled = await Promise.allSettled(
+        batch.map(async (dm) => {
+          const channelId = dm.id as string;
+          const userId = dm.user_id as string;
+          const dmCount = (dm.dm_count as number) ?? 0;
+
+          let latestText = "";
+          let latestTs = "";
+          try {
+            const history = await slack.conversations.history({
+              channel: channelId,
+              limit: 1,
+            });
+            const msg = history.messages?.[0];
+            if (msg) {
+              latestText = msg.text ?? "";
+              latestTs = msg.ts ?? "";
+            }
+          } catch {
+            // ignore - we'll show the DM without a snippet
+          }
+
+          // Resolve user name
+          const nameMap = await resolveUserNames([userId], teamId);
+          const userName = nameMap.get(userId) ?? userId;
+
+          // Replace user mentions in snippet
+          latestText = latestText.replace(/<@(U[A-Z0-9]+)>/g, (_, id) => `@${nameMap.get(id) ?? id}`);
+
+          return {
+            channelId,
+            userId,
+            userName,
+            unreadCount: dmCount,
+            latestText,
+            latestTs,
+            teamId: teamId ?? null,
+          };
+        }),
+      );
+      for (const r of settled) {
+        if (r.status === "fulfilled") results.push(r.value);
+      }
+    }
+  };
+
+  const desktop = getDesktopCredentials();
+  if (desktop.workspaces.length > 0) {
+    for (const ws of desktop.workspaces) {
+      try {
+        await attemptForTeam(ws.teamId);
+      } catch (err) {
+        if (isRetryableAuthError(err)) {
+          resetSlackClients();
+          try { await attemptForTeam(ws.teamId); } catch { /* ignore */ }
+        } else {
+          console.error(`[slack:dm] detail error for ${ws.teamName}:`, err);
+        }
+      }
+    }
+  } else {
+    try {
+      await attemptForTeam();
+    } catch (err) {
+      if (isRetryableAuthError(err)) {
+        resetSlackClients();
+        try { await attemptForTeam(); } catch { /* ignore */ }
+      } else {
+        console.error("[slack:dm] detail error:", err);
+      }
+    }
+  }
+
+  // Sort by latest message timestamp descending
+  results.sort((a, b) => b.latestTs.localeCompare(a.latestTs));
+  return results;
+}
+
 export async function resolveChannelId(
   name: string,
   teamId?: string | null
