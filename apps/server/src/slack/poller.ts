@@ -1,16 +1,9 @@
-import { eq, and } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { db } from "../db/index.js";
-import { slackChannels, slackConversations, slackDayHeadlines, todos, settings } from "../db/schema.js";
-import { fetchChannelMessages } from "./client.js";
-import { getAuthStatus } from "./client.js";
-import {
-  groupIntoConversations,
-  summarizeMessages,
-  summarizeConversation,
-  generateDayHeadline,
-} from "./summarizer.js";
+import { slackChannels, slackConversations } from "../db/schema.js";
+import { fetchChannelMessages, getAuthStatus } from "./client.js";
+import type { SlackMessage } from "./client.js";
 import { broadcast } from "../ws/events.js";
-import { createNotification } from "../notifications/create.js";
 
 let intervalId: ReturnType<typeof setInterval> | null = null;
 
@@ -63,17 +56,24 @@ export async function pollSingleChannel(channelId: string) {
   await pollChannel(channel);
 }
 
+/** Group flat messages into conversations (threads). */
+function groupIntoConversations(messages: SlackMessage[]) {
+  const threads = new Map<string, SlackMessage[]>();
+  const order: string[] = [];
+
+  for (const m of messages) {
+    const key = m.threadTs ?? m.ts;
+    if (!threads.has(key)) {
+      threads.set(key, []);
+      order.push(key);
+    }
+    threads.get(key)!.push(m);
+  }
+
+  return order.map((ts) => ({ parentTs: ts, messages: threads.get(ts)! }));
+}
+
 async function pollChannel(channel: typeof slackChannels.$inferSelect) {
-  const isInitialPoll = !channel.lastPolledAt;
-
-  // Read configured summarization model from settings
-  const modelSetting = await db
-    .select()
-    .from(settings)
-    .where(eq(settings.key, "slack.summarizationModel"))
-    .get();
-  const model = modelSetting?.value || null;
-
   // Default to 7 days ago for first poll
   const oldest = channel.lastPolledAt
     ? (new Date(channel.lastPolledAt).getTime() / 1000).toString()
@@ -94,131 +94,60 @@ async function pollChannel(channel: typeof slackChannels.$inferSelect) {
 
   const existingByTs = new Map(existingRows.map((r) => [r.conversationTs, r]));
 
-  // Determine which conversations need (re-)summarization
-  const changed: { parentTs: string; messages: typeof messages }[] = [];
-  const unchanged: string[] = []; // parentTs values that don't need updates
+  const now = new Date().toISOString();
+  let upsertCount = 0;
 
   for (const conv of conversations) {
     const existing = existingByTs.get(conv.parentTs);
-    if (!existing || conv.messages.length > existing.messageCount) {
-      changed.push(conv);
-    } else {
-      unchanged.push(conv.parentTs);
-    }
-  }
 
-  if (changed.length === 0) {
-    // Nothing new — just update lastPolledAt
-    const now = new Date().toISOString();
-    await db
-      .update(slackChannels)
-      .set({ lastPolledAt: now })
-      .where(eq(slackChannels.id, channel.id));
-    return;
-  }
+    // Skip if message count hasn't changed
+    if (existing && conv.messages.length <= existing.messageCount) continue;
 
-  const now = new Date().toISOString();
-
-  // Map from parentTs -> { summary, todos, isNew }
-  const results = new Map<
-    string,
-    { summary: string; todos: { title: string; description: string; priority: "low" | "medium" | "high"; messageTs?: string }[]; isNew: boolean }
-  >();
-
-  if (changed.length > 3) {
-    // Batch path: call summarizeMessages for all changed conversations' messages
-    const allChangedMessages = changed.flatMap((c) => c.messages);
-    const batchResult = await summarizeMessages(
-      channel.name,
-      channel.focus,
-      channel.ignore,
-      allChangedMessages,
-      channel.todoFocus,
-      channel.context,
-      model,
+    const parentMsg = conv.messages[0];
+    const mentionsMe = conv.messages.some(
+      (m) => m.user === "you" || m.text.includes("@you"),
     );
-
-    // Map bullets back to conversations by messageTs
-    const bulletsByTs = new Map<string, string>();
-    for (const bullet of batchResult.bullets) {
-      if (bullet.messageTs) {
-        bulletsByTs.set(bullet.messageTs, bullet.text);
-      }
-    }
-
-    // Distribute todos by messageTs
-    const todosByTs = new Map<string, typeof batchResult.todos>();
-    for (const todo of batchResult.todos) {
-      if (todo.messageTs) {
-        const list = todosByTs.get(todo.messageTs) ?? [];
-        list.push(todo);
-        todosByTs.set(todo.messageTs, list);
-      }
-    }
-
-    for (const conv of changed) {
-      const isNew = !existingByTs.has(conv.parentTs);
-      const summary = bulletsByTs.get(conv.parentTs) ?? "";
-      const convTodos = todosByTs.get(conv.parentTs) ?? [];
-      results.set(conv.parentTs, { summary, todos: convTodos, isNew });
-    }
-  } else {
-    // Incremental path: summarize each conversation individually
-    for (const conv of changed) {
-      const isNew = !existingByTs.has(conv.parentTs);
-      const result = await summarizeConversation(
-        channel.name,
-        channel.focus,
-        channel.ignore,
-        conv.messages,
-        channel.todoFocus,
-        channel.context,
-        model,
-      );
-      results.set(conv.parentTs, { summary: result.summary, todos: result.todos, isNew });
-    }
-  }
-
-  // Upsert slack_conversations rows
-  const affectedDays = new Set<string>();
-
-  for (const conv of changed) {
-    const result = results.get(conv.parentTs)!;
-    // Skip empty summaries (off-topic/ignored conversations)
-    if (!result.summary) continue;
-
-    const parentTsFloat = parseFloat(conv.parentTs);
-    const day = new Date(parentTsFloat * 1000).toISOString().slice(0, 10);
-    affectedDays.add(day);
 
     const firstTs = Math.min(...conv.messages.map((m) => parseFloat(m.ts)));
     const lastTs = Math.max(...conv.messages.map((m) => parseFloat(m.ts)));
     const firstMessageAt = new Date(firstTs * 1000).toISOString();
     const lastMessageAt = new Date(lastTs * 1000).toISOString();
+    const parentTsFloat = parseFloat(conv.parentTs);
+    const day = new Date(parentTsFloat * 1000).toISOString().slice(0, 10);
 
-    const existing = existingByTs.get(conv.parentTs);
+    const messagesJson = JSON.stringify(
+      conv.messages.map((m) => ({
+        user: m.user,
+        text: m.text,
+        ts: m.ts,
+        ...(m.threadTs ? { threadTs: m.threadTs } : {}),
+      })),
+    );
+
     if (existing) {
-      // Update
       await db
         .update(slackConversations)
         .set({
-          summary: result.summary,
+          messages: messagesJson,
+          mentionsMe,
+          parentText: parentMsg.text,
+          parentUser: parentMsg.user,
           messageCount: conv.messages.length,
           lastMessageAt,
           updatedAt: now,
         })
         .where(eq(slackConversations.id, existing.id));
-      // Also mark existing day as affected
-      affectedDays.add(existing.day);
     } else {
-      // Insert
       await db.insert(slackConversations).values({
         id: crypto.randomUUID(),
         channelId: channel.id,
         channelName: channel.name,
         conversationTs: conv.parentTs,
         day,
-        summary: result.summary,
+        messages: messagesJson,
+        mentionsMe,
+        parentText: parentMsg.text,
+        parentUser: parentMsg.user,
         messageCount: conv.messages.length,
         firstMessageAt,
         lastMessageAt,
@@ -227,83 +156,7 @@ async function pollChannel(channel: typeof slackChannels.$inferSelect) {
       });
     }
 
-    // Extract todos only from newly inserted conversations
-    if (result.isNew && channel.todosEnabled !== false && !isInitialPoll) {
-      for (const todo of result.todos) {
-        const url = channel.teamId
-          ? `slack://channel?team=${channel.teamId}&id=${channel.slackChannelId}${todo.messageTs ? `&message=${todo.messageTs}` : ""}`
-          : `slack://channel?id=${channel.slackChannelId}${todo.messageTs ? `&message=${todo.messageTs}` : ""}`;
-
-        const todoId = crypto.randomUUID();
-        await db.insert(todos).values({
-          id: todoId,
-          source: "slack",
-          title: todo.title,
-          description: todo.description,
-          priority: todo.priority,
-          url,
-          completed: false,
-          createdAt: now,
-          updatedAt: now,
-        });
-        await createNotification({
-          type: "todo_created",
-          title: "New todo from Slack",
-          detail: todo.title,
-          url,
-          meta: { todoId, channelName: channel.name },
-        });
-      }
-    }
-  }
-
-  // Regenerate day headlines for affected days
-  for (const day of affectedDays) {
-    const dayConvs = await db
-      .select()
-      .from(slackConversations)
-      .where(
-        and(
-          eq(slackConversations.channelId, channel.id),
-          eq(slackConversations.day, day),
-        )
-      )
-      .all();
-
-    const summaries = dayConvs.map((c) => c.summary).filter(Boolean);
-    const headline = await generateDayHeadline(channel.name, summaries, model);
-
-    const existingHeadline = await db
-      .select()
-      .from(slackDayHeadlines)
-      .where(
-        and(
-          eq(slackDayHeadlines.channelId, channel.id),
-          eq(slackDayHeadlines.day, day),
-        )
-      )
-      .get();
-
-    if (existingHeadline) {
-      await db
-        .update(slackDayHeadlines)
-        .set({
-          headline,
-          conversationCount: dayConvs.length,
-          updatedAt: now,
-        })
-        .where(eq(slackDayHeadlines.id, existingHeadline.id));
-    } else {
-      await db.insert(slackDayHeadlines).values({
-        id: crypto.randomUUID(),
-        channelId: channel.id,
-        day,
-        headline,
-        conversationCount: dayConvs.length,
-        createdAt: now,
-        updatedAt: now,
-      });
-    }
+    upsertCount++;
   }
 
   // Update lastPolledAt
@@ -314,10 +167,7 @@ async function pollChannel(channel: typeof slackChannels.$inferSelect) {
 
   broadcast({ type: "slack:summary", channelId: channel.id, summaryId: "" });
 
-  const todoCount = [...results.values()]
-    .filter((r) => r.isNew)
-    .reduce((sum, r) => sum + r.todos.length, 0);
   console.log(
-    `[slack] ${channel.name}: ${messages.length} messages, ${changed.length} conversations updated, ${todoCount} todos`
+    `[slack] ${channel.name}: ${messages.length} messages, ${upsertCount} conversations upserted`,
   );
 }

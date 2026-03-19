@@ -206,5 +206,61 @@ export function migrate() {
       ON notifications(read, created_at);
   `);
 
+  // Drop slack_summaries and slack_day_headlines tables; rebuild slack_channels and slack_conversations
+  const hasFocus = sqlite.prepare(`SELECT COUNT(*) as cnt FROM pragma_table_info('slack_channels') WHERE name = 'focus'`).get() as { cnt: number };
+  if (hasFocus.cnt) {
+    sqlite.exec(`
+      DROP TABLE IF EXISTS slack_summaries;
+      DROP TABLE IF EXISTS slack_day_headlines;
+
+      CREATE TABLE slack_channels_new (
+        id TEXT PRIMARY KEY,
+        slack_channel_id TEXT NOT NULL,
+        name TEXT NOT NULL,
+        enabled INTEGER NOT NULL DEFAULT 1,
+        last_polled_at TEXT,
+        team_id TEXT,
+        sort_order INTEGER,
+        created_at TEXT NOT NULL
+      );
+      INSERT INTO slack_channels_new (id, slack_channel_id, name, enabled, last_polled_at, team_id, sort_order, created_at)
+        SELECT id, slack_channel_id, name, enabled, last_polled_at, team_id, sort_order, created_at FROM slack_channels;
+      DROP TABLE slack_channels;
+      ALTER TABLE slack_channels_new RENAME TO slack_channels;
+    `);
+  }
+
+  const hasSummary = sqlite.prepare(`SELECT COUNT(*) as cnt FROM pragma_table_info('slack_conversations') WHERE name = 'summary'`).get() as { cnt: number };
+  if (hasSummary.cnt) {
+    sqlite.exec(`
+      CREATE TABLE slack_conversations_new (
+        id TEXT PRIMARY KEY,
+        channel_id TEXT NOT NULL,
+        channel_name TEXT NOT NULL,
+        conversation_ts TEXT NOT NULL,
+        day TEXT NOT NULL,
+        messages TEXT NOT NULL DEFAULT '[]',
+        mentions_me INTEGER NOT NULL DEFAULT 0,
+        parent_text TEXT NOT NULL DEFAULT '',
+        parent_user TEXT NOT NULL DEFAULT '',
+        message_count INTEGER NOT NULL,
+        first_message_at TEXT NOT NULL,
+        last_message_at TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+      INSERT INTO slack_conversations_new (id, channel_id, channel_name, conversation_ts, day, message_count, first_message_at, last_message_at, created_at, updated_at)
+        SELECT id, channel_id, channel_name, conversation_ts, day, message_count, first_message_at, last_message_at, created_at, updated_at FROM slack_conversations;
+      DROP TABLE slack_conversations;
+      ALTER TABLE slack_conversations_new RENAME TO slack_conversations;
+
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_slack_conversations_channel_ts
+        ON slack_conversations(channel_id, conversation_ts);
+
+      CREATE INDEX IF NOT EXISTS idx_slack_conversations_channel_day
+        ON slack_conversations(channel_id, day);
+    `);
+  }
+
   console.log("[db] migrations applied");
 }

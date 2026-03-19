@@ -1,8 +1,8 @@
 import { z } from "zod";
-import { eq, desc, and, asc, isNull, sql } from "drizzle-orm";
+import { eq, desc, asc, sql } from "drizzle-orm";
 import { router, publicProcedure } from "../trpc.js";
 import { db } from "../db/index.js";
-import { slackChannels, slackSummaries, slackConversations, slackDayHeadlines } from "../db/schema.js";
+import { slackChannels, slackConversations } from "../db/schema.js";
 import { resolveChannelId, getAuthStatus, resetSlackClients } from "./client.js";
 import { pollAllChannels, pollSingleChannel } from "./poller.js";
 import { getUnreadDmStats, getUnreadDmDetails } from "./dm-poller.js";
@@ -49,12 +49,7 @@ export const slackRouter = router({
         z.object({
           name: z.string().min(1),
           slackChannelId: z.string().optional(),
-          focus: z.string().default(""),
-          ignore: z.string().optional(),
           teamId: z.string().optional(),
-          todosEnabled: z.boolean().optional(),
-          todoFocus: z.string().optional(),
-          context: z.string().optional(),
         })
       )
       .mutation(async ({ input }) => {
@@ -74,13 +69,8 @@ export const slackRouter = router({
           id,
           slackChannelId: channelId,
           name: channelName,
-          focus: input.focus,
-          ignore: input.ignore ?? null,
-          context: input.context ?? null,
           teamId: input.teamId ?? null,
           enabled: true,
-          todosEnabled: input.todosEnabled ?? false,
-          todoFocus: input.todoFocus ?? null,
           createdAt: new Date().toISOString(),
         });
         return { id };
@@ -90,22 +80,12 @@ export const slackRouter = router({
       .input(
         z.object({
           id: z.string(),
-          focus: z.string().optional(),
-          ignore: z.string().optional(),
           enabled: z.boolean().optional(),
-          todosEnabled: z.boolean().optional(),
-          todoFocus: z.string().optional(),
-          context: z.string().optional(),
         })
       )
       .mutation(async ({ input }) => {
         const updates: Record<string, unknown> = {};
-        if (input.focus !== undefined) updates.focus = input.focus;
-        if (input.ignore !== undefined) updates.ignore = input.ignore;
         if (input.enabled !== undefined) updates.enabled = input.enabled;
-        if (input.todosEnabled !== undefined) updates.todosEnabled = input.todosEnabled;
-        if (input.todoFocus !== undefined) updates.todoFocus = input.todoFocus;
-        if (input.context !== undefined) updates.context = input.context;
 
         await db
           .update(slackChannels)
@@ -122,126 +102,44 @@ export const slackRouter = router({
       }),
   }),
 
-  summaries: router({
-    list: publicProcedure
-      .input(z.object({ channelId: z.string().optional() }).optional())
+  threads: router({
+    mentions: publicProcedure
+      .input(z.object({ limit: z.number().optional() }).optional())
       .query(async ({ input }) => {
-        if (input?.channelId) {
-          return db
-            .select()
-            .from(slackSummaries)
-            .where(eq(slackSummaries.channelId, input.channelId))
-            .orderBy(desc(slackSummaries.createdAt))
-            .limit(50)
-            .all();
-        }
-        return db
-          .select()
-          .from(slackSummaries)
-          .orderBy(desc(slackSummaries.createdAt))
-          .limit(50)
-          .all();
+        const limit = input?.limit ?? 50;
+        return db.select().from(slackConversations)
+          .where(eq(slackConversations.mentionsMe, true))
+          .orderBy(desc(slackConversations.lastMessageAt))
+          .limit(limit).all();
+      }),
+
+    byChannel: publicProcedure
+      .input(z.object({ channelId: z.string(), limit: z.number().optional() }))
+      .query(async ({ input }) => {
+        const limit = input.limit ?? 50;
+        return db.select().from(slackConversations)
+          .where(eq(slackConversations.channelId, input.channelId))
+          .orderBy(desc(slackConversations.lastMessageAt))
+          .limit(limit).all();
       }),
 
     latest: publicProcedure.query(async () => {
-      // One latest summary per channel using a subquery approach
-      const channels = await db.select().from(slackChannels).all();
-      const results = [];
-
-      for (const channel of channels) {
-        const [summary] = await db
-          .select()
-          .from(slackSummaries)
-          .where(eq(slackSummaries.channelId, channel.id))
-          .orderBy(desc(slackSummaries.createdAt))
-          .limit(1)
-          .all();
-
-        results.push({
-          channel,
-          summary: summary ?? null,
-        });
-      }
-
-      return results;
-    }),
-  }),
-
-  conversations: router({
-    byDay: publicProcedure
-      .input(
-        z.object({
-          channelId: z.string(),
-          limit: z.number().optional(),
-        })
-      )
-      .query(async ({ input }) => {
-        const limit = input.limit ?? 14;
-
-        // Get day headlines for this channel
-        const headlines = await db
-          .select()
-          .from(slackDayHeadlines)
-          .where(eq(slackDayHeadlines.channelId, input.channelId))
-          .orderBy(desc(slackDayHeadlines.day))
-          .limit(limit)
-          .all();
-
-        // Get conversations for these days
-        const days = await Promise.all(
-          headlines.map(async (h) => {
-            const convs = await db
-              .select()
-              .from(slackConversations)
-              .where(
-                and(
-                  eq(slackConversations.channelId, input.channelId),
-                  eq(slackConversations.day, h.day),
-                )
-              )
-              .orderBy(desc(slackConversations.lastMessageAt))
-              .all();
-
-            return {
-              day: h.day,
-              headline: h.headline,
-              conversationCount: h.conversationCount,
-              conversations: convs,
-            };
-          })
-        );
-
-        return { days };
-      }),
-
-    latest: publicProcedure.query(async () => {
-      const channels = await db
-        .select()
-        .from(slackChannels)
+      const channels = await db.select().from(slackChannels)
         .where(eq(slackChannels.enabled, true))
         .orderBy(
           sql`CASE WHEN ${slackChannels.sortOrder} IS NULL THEN 1 ELSE 0 END`,
           asc(slackChannels.sortOrder),
           asc(slackChannels.createdAt),
-        )
-        .all();
+        ).all();
+
       const results = [];
-
       for (const channel of channels) {
-        const [dayHeadline] = await db
-          .select()
-          .from(slackDayHeadlines)
-          .where(eq(slackDayHeadlines.channelId, channel.id))
-          .orderBy(desc(slackDayHeadlines.day))
-          .limit(1)
-          .all();
-
-        results.push({
-          channel,
-          dayHeadline: dayHeadline ?? null,
-        });
+        const [thread] = await db.select().from(slackConversations)
+          .where(eq(slackConversations.channelId, channel.id))
+          .orderBy(desc(slackConversations.lastMessageAt))
+          .limit(1).all();
+        results.push({ channel, thread: thread ?? null });
       }
-
       return results;
     }),
   }),

@@ -4,28 +4,10 @@ export const slackChannels = sqliteTable("slack_channels", {
   id: text("id").primaryKey(),
   slackChannelId: text("slack_channel_id").notNull(),
   name: text("name").notNull(),
-  focus: text("focus").notNull(),
-  ignore: text("ignore"),
-  context: text("context"),
   enabled: integer("enabled", { mode: "boolean" }).notNull().default(true),
-  todosEnabled: integer("todos_enabled", { mode: "boolean" }).notNull().default(true),
-  todoFocus: text("todo_focus"),
   lastPolledAt: text("last_polled_at"),
   teamId: text("team_id"),
   sortOrder: integer("sort_order"),
-  createdAt: text("created_at").notNull(),
-});
-
-export const slackSummaries = sqliteTable("slack_summaries", {
-  id: text("id").primaryKey(),
-  channelId: text("channel_id").notNull(),
-  channelName: text("channel_name").notNull(),
-  headline: text("headline"),
-  summary: text("summary").notNull(),
-  bullets: text("bullets"),
-  messageCount: integer("message_count").notNull(),
-  periodStart: text("period_start").notNull(),
-  periodEnd: text("period_end").notNull(),
   createdAt: text("created_at").notNull(),
 });
 
@@ -34,21 +16,14 @@ export const slackConversations = sqliteTable("slack_conversations", {
   channelId: text("channel_id").notNull(),
   channelName: text("channel_name").notNull(),
   conversationTs: text("conversation_ts").notNull(),
-  day: text("day").notNull(), // YYYY-MM-DD in UTC
-  summary: text("summary").notNull(),
+  day: text("day").notNull(),
+  messages: text("messages").notNull(), // JSON array of {user, text, ts, threadTs?}
+  mentionsMe: integer("mentions_me", { mode: "boolean" }).notNull().default(false),
+  parentText: text("parent_text").notNull(),
+  parentUser: text("parent_user").notNull(),
   messageCount: integer("message_count").notNull(),
   firstMessageAt: text("first_message_at").notNull(),
   lastMessageAt: text("last_message_at").notNull(),
-  createdAt: text("created_at").notNull(),
-  updatedAt: text("updated_at").notNull(),
-});
-
-export const slackDayHeadlines = sqliteTable("slack_day_headlines", {
-  id: text("id").primaryKey(),
-  channelId: text("channel_id").notNull(),
-  day: text("day").notNull(), // YYYY-MM-DD
-  headline: text("headline").notNull(),
-  conversationCount: integer("conversation_count").notNull(),
   createdAt: text("created_at").notNull(),
   updatedAt: text("updated_at").notNull(),
 });
