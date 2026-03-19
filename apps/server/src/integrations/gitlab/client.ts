@@ -276,6 +276,12 @@ async function enrichMR(
     }
   }
 
+  // Also check if you're listed as a reviewer on the MR
+  const isReviewer = (mrDetail.reviewers ?? []).some((r) => r.id === userId);
+  if (isReviewer && !approved) {
+    needs_your_approval = true;
+  }
+
   // Check mentions in notes
   const notes: MergeRequestNote[] = await gitlabFetch(
     `${base}/notes?per_page=50`,

@@ -463,7 +463,7 @@ function GitHubDetailView({
 
 // ── Main Page ──
 
-type Tab = "mine" | "team" | "review" | "mentions";
+type Tab = "mine" | "team" | "review";
 type SelectedPR = { provider: "github"; repo: string; number: number } | { provider: "gitlab"; projectId: number; iid: number };
 
 function SourceControlPage() {
@@ -493,13 +493,12 @@ function SourceControlPage() {
   }, [utils]);
   const teamConfigured = teamMembers && teamMembers.length > 0;
 
-  const { myPRs, teamPRs, reviewPRs, mentionPRs } = useMemo(() => {
-    if (!allPRs) return { myPRs: [], teamPRs: [], reviewPRs: [], mentionPRs: [] };
+  const { myPRs, teamPRs, reviewPRs } = useMemo(() => {
+    if (!allPRs) return { myPRs: [], teamPRs: [], reviewPRs: [] };
     return {
       myPRs: allPRs.filter((pr) => pr.is_mine),
       teamPRs: allPRs.filter((pr) => pr.is_team_member),
       reviewPRs: allPRs.filter((pr) => pr.needs_your_review),
-      mentionPRs: allPRs.filter((pr) => pr.you_are_mentioned),
     };
   }, [allPRs]);
 
@@ -508,9 +507,7 @@ function SourceControlPage() {
       ? myPRs
       : tab === "team"
         ? teamPRs
-        : tab === "review"
-          ? reviewPRs
-          : mentionPRs;
+        : reviewPRs;
 
   if (selectedPR) {
     if (selectedPR.provider === "gitlab") {
@@ -590,7 +587,6 @@ function SourceControlPage() {
           { key: "mine" as Tab, label: "Mine", count: myPRs.length },
           { key: "team" as Tab, label: "Team", count: teamPRs.length },
           { key: "review" as Tab, label: "Needs Review", count: reviewPRs.length },
-          { key: "mentions" as Tab, label: "Mentions", count: mentionPRs.length },
         ] as const).map((t) => (
           <button
             key={t.key}
