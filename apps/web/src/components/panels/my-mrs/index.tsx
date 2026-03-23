@@ -20,6 +20,7 @@ function statusColor(status: string | null): string {
     case "success": return "text-neon-green";
     case "failed": return "text-red-400";
     case "running": case "pending": return "text-neon-yellow";
+    case "manual": case "created": case "waiting_for_resource": case "scheduled": return "text-neon-purple";
     default: return "text-text-muted";
   }
 }

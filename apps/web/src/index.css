@@ -3,6 +3,10 @@
 
 @custom-variant dark (&:is(.dark *));
 
+html, body {
+  overscroll-behavior: none;
+}
+
 /* ═══════════════════════════════════════════
    Base theme tokens — overridden per theme
    ═══════════════════════════════════════════ */

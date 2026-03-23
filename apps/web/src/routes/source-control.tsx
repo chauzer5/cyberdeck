@@ -153,6 +153,7 @@ function PRCard({
               pr.check_status === "success" ? "text-neon-green"
                 : pr.check_status === "running" || pr.check_status === "pending" ? "text-neon-yellow"
                 : pr.check_status === "failed" || pr.check_status === "failure" ? "text-red-400"
+                : pr.check_status === "manual" || pr.check_status === "created" || pr.check_status === "waiting_for_resource" || pr.check_status === "scheduled" ? "text-neon-purple"
                 : "text-text-muted",
             )}>
               Pipeline
@@ -162,6 +163,7 @@ function PRCard({
               pr.check_status === "success" ? "bg-neon-green shadow-[0_0_8px_rgba(0,255,136,0.5)]"
                 : pr.check_status === "running" || pr.check_status === "pending" ? "bg-neon-yellow shadow-[0_0_8px_rgba(250,204,21,0.5)]"
                 : pr.check_status === "failed" || pr.check_status === "failure" ? "bg-red-400 shadow-[0_0_8px_rgba(239,68,68,0.5)]"
+                : pr.check_status === "manual" || pr.check_status === "created" || pr.check_status === "waiting_for_resource" || pr.check_status === "scheduled" ? "bg-neon-purple shadow-[0_0_8px_rgba(168,85,247,0.5)]"
                 : "bg-text-muted/40",
             )} />
           </div>
