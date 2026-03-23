@@ -4,14 +4,49 @@ import * as pty from "node-pty";
 import { broadcast } from "../ws/events.js";
 
 const KILL_TIMEOUT_MS = 5000;
+const IDLE_TIMEOUT_MS = 10_000;
+
+// Matches Claude Code's working spinner, e.g. "\r✽Recombobulating…"
+// eslint-disable-next-line no-control-regex
+const BUSY_PATTERN = /\r[·✢✳✶✻✽]?[A-Z][a-z]+(?:\.\.\.|\u2026)/;
+
+function stripAnsi(str: string): string {
+  return str
+    // eslint-disable-next-line no-control-regex
+    .replace(/\x1b\[[?>=!]?[0-9;]*[a-zA-Z~]/g, "")
+    // eslint-disable-next-line no-control-regex
+    .replace(/\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)?/g, "")
+    // eslint-disable-next-line no-control-regex
+    .replace(/\x1b[^[\]]/g, "");
+}
 
 let currentPty: pty.IPty | null = null;
 let currentId: string | null = null;
 let pendingSpawn: { command: string; args: string[]; cwd: string } | null = null;
 
-// Agent activity state: "idle" (waiting for input), "busy" (working), "not_running"
-// TODO: revisit activity detection — session file watching was unreliable
 let activityState: "idle" | "busy" | "not_running" = "not_running";
+let idleTimer: ReturnType<typeof setTimeout> | null = null;
+
+function updateActivity(data: string): void {
+  const clean = stripAnsi(data);
+
+  // Spinner pattern triggers idle → busy
+  if (activityState !== "busy" && BUSY_PATTERN.test(clean)) {
+    console.log(`[agent-activity] → busy (was ${activityState})`);
+    activityState = "busy";
+  }
+
+  // Any output while busy resets the idle timer
+  if (activityState === "busy") {
+    if (idleTimer) clearTimeout(idleTimer);
+    idleTimer = setTimeout(() => {
+      if (activityState === "busy") {
+        console.log(`[agent-activity] → idle (no output for ${IDLE_TIMEOUT_MS}ms)`);
+        activityState = "idle";
+      }
+    }, IDLE_TIMEOUT_MS);
+  }
+}
 
 export function createPendingAgent(
   command: string,
@@ -56,7 +91,10 @@ export function startAgent(cols: number, rows: number): boolean {
   activityState = "idle";
 
   ptyProcess.onData((data: string) => {
-    broadcast({ type: "agent:stdout", agentId: id, data });
+    updateActivity(data);
+    // Decouple broadcast from PTY read to prevent WebSocket backpressure
+    // from stalling the PTY when the frontend tab is hidden
+    setImmediate(() => broadcast({ type: "agent:stdout", agentId: id, data }));
   });
 
   ptyProcess.onExit(({ exitCode }) => {
@@ -64,6 +102,7 @@ export function startAgent(cols: number, rows: number): boolean {
       currentPty = null;
       currentId = null;
       activityState = "not_running";
+      if (idleTimer) { clearTimeout(idleTimer); idleTimer = null; }
     }
     broadcast({ type: "agent:exit", agentId: id, code: exitCode });
   });
@@ -96,6 +135,7 @@ export function redrawAgent(): boolean {
 
 export function stopAgent(): boolean {
   activityState = "not_running";
+  if (idleTimer) { clearTimeout(idleTimer); idleTimer = null; }
   if (!currentPty) {
     // Pending but not started — just clear
     if (currentId) {
