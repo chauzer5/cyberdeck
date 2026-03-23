@@ -41,7 +41,6 @@ export function AgentMonitorPanel() {
     <PanelShell
       title="Claude Agent"
       icon={<Bot className="h-4 w-4" />}
-      badge={config.label}
       loading={status.isLoading}
       error={status.error?.message}
       className="col-span-full self-start"
