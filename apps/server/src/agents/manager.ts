@@ -32,7 +32,6 @@ function updateActivity(data: string): void {
 
   // Spinner pattern triggers idle → busy
   if (activityState !== "busy" && BUSY_PATTERN.test(clean)) {
-    console.log(`[agent-activity] → busy (was ${activityState})`);
     activityState = "busy";
   }
 
@@ -41,7 +40,6 @@ function updateActivity(data: string): void {
     if (idleTimer) clearTimeout(idleTimer);
     idleTimer = setTimeout(() => {
       if (activityState === "busy") {
-        console.log(`[agent-activity] → idle (no output for ${IDLE_TIMEOUT_MS}ms)`);
         activityState = "idle";
       }
     }, IDLE_TIMEOUT_MS);
