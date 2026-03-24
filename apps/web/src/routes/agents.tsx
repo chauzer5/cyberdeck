@@ -14,7 +14,7 @@ import { trpc } from "@/trpc";
 import { useWebSocket } from "@/hooks/useWebSocket";
 import { useAgentsStore } from "@/stores/agents";
 import { AgentChat } from "@/components/AgentChat";
-import { cn } from "@/lib/utils";
+import { cn, timeAgo } from "@/lib/utils";
 
 const STATUS_CONFIG = {
   running: {
@@ -39,15 +39,6 @@ const STATUS_CONFIG = {
   },
 } as const;
 
-function timeAgo(dateStr: string): string {
-  const diff = Date.now() - new Date(dateStr).getTime();
-  const mins = Math.floor(diff / 60000);
-  if (mins < 1) return "just now";
-  if (mins < 60) return `${mins}m ago`;
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
-  return `${Math.floor(hrs / 24)}d ago`;
-}
 
 function AgentNameEditor({
   agentId,

@@ -13,21 +13,11 @@ import {
   Check,
 } from "lucide-react";
 import { trpc } from "@/trpc";
-import { cn } from "@/lib/utils";
+import { cn, timeAgo } from "@/lib/utils";
 import { TeamSetupModal } from "@/components/TeamSetupModal";
 
 // ── Helpers ──
 
-function timeAgo(dateStr: string): string {
-  const diffMs = Date.now() - new Date(dateStr).getTime();
-  const mins = Math.floor(diffMs / 60000);
-  if (mins < 1) return "just now";
-  if (mins < 60) return `${mins}m ago`;
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
-  const days = Math.floor(hrs / 24);
-  return `${days}d ago`;
-}
 
 function getPriorityLabel(p: number): string {
   switch (p) {

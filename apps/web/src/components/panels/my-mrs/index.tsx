@@ -2,18 +2,7 @@ import { useNavigate } from "@tanstack/react-router";
 import { GitMerge, ExternalLink } from "lucide-react";
 import { trpc } from "@/trpc";
 import { PanelShell } from "@/components/layout/PanelShell";
-import { cn } from "@/lib/utils";
-
-function timeAgo(dateStr: string): string {
-  const diffMs = Date.now() - new Date(dateStr).getTime();
-  const mins = Math.floor(diffMs / 60000);
-  if (mins < 1) return "just now";
-  if (mins < 60) return `${mins}m ago`;
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
-  const days = Math.floor(hrs / 24);
-  return `${days}d ago`;
-}
+import { cn, timeAgo } from "@/lib/utils";
 
 function statusColor(status: string | null): string {
   switch (status) {

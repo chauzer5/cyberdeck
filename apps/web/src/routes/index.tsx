@@ -1,4 +1,5 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { createRoute } from "@tanstack/react-router";
 import { rootRoute } from "./__root";
 import { PanelGrid } from "@/components/layout/PanelGrid";
@@ -15,7 +16,7 @@ import { useLinearEnabled } from "@/hooks/useLinearEnabled";
 import { useTodosEnabled } from "@/hooks/useTodosEnabled";
 import { useAgentsEnabled } from "@/hooks/useAgentsEnabled";
 import { trpc } from "@/trpc";
-import { cn } from "@/lib/utils";
+import { cn, timeAgoFromMs } from "@/lib/utils";
 import { RefreshCw, CheckCircle, Loader2 } from "lucide-react";
 
 function Dashboard() {
@@ -30,17 +31,30 @@ function Dashboard() {
     retry: 3,
   });
   const serverUp = !!ping.data;
-  const utils = trpc.useUtils();
+  const syncingRef = useRef(false);
   const [syncing, setSyncing] = useState(false);
+  const [lastSyncedAt, setLastSyncedAt] = useState<number>(Date.now());
+  const [, setTick] = useState(0);
 
+  // Re-render every 15s to keep "Last synced" label fresh
+  useEffect(() => {
+    const id = setInterval(() => setTick((t) => t + 1), 15_000);
+    return () => clearInterval(id);
+  }, []);
+
+  const queryClient = useQueryClient();
   const handleSyncAll = useCallback(async () => {
+    if (syncingRef.current) return;
+    syncingRef.current = true;
     setSyncing(true);
     try {
-      await utils.invalidate();
+      await queryClient.invalidateQueries({ refetchType: "all" });
+      setLastSyncedAt(Date.now());
     } finally {
+      syncingRef.current = false;
       setSyncing(false);
     }
-  }, [utils]);
+  }, [queryClient]);
 
   const today = new Date().toLocaleDateString("en-US", {
     weekday: "long",
@@ -67,11 +81,14 @@ function Dashboard() {
               Server connected
             </div>
           </div>
+          <span className="text-[11px] text-text-muted">
+            Last synced: {timeAgoFromMs(lastSyncedAt)}
+          </span>
           <button
             onClick={handleSyncAll}
             disabled={syncing}
             className={cn(
-              "flex items-center gap-1.5 rounded-lg border border-border bg-transparent px-3.5 py-[7px] text-xs font-medium text-text-secondary transition-all hover:border-border-hover hover:bg-[rgba(255,45,123,0.06)]",
+              "flex items-center gap-1.5 rounded-lg border border-border bg-transparent px-3.5 py-[7px] text-xs font-medium text-text-secondary hover:border-border-hover hover:bg-[rgba(255,45,123,0.06)]",
               syncing && "pointer-events-none opacity-60"
             )}
           >

@@ -18,7 +18,7 @@ import {
   AlertCircle,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn, timeAgo } from "@/lib/utils";
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import { useSlackEnabled } from "@/hooks/useSlackEnabled";
 import { useSourceControlEnabled } from "@/hooks/useSourceControlEnabled";
@@ -28,16 +28,6 @@ import { useTodosEnabled } from "@/hooks/useTodosEnabled";
 import { useWebSocket } from "@/hooks/useWebSocket";
 import { trpc } from "@/trpc";
 
-function timeAgo(dateStr: string): string {
-  const diffMs = Date.now() - new Date(dateStr).getTime();
-  const mins = Math.floor(diffMs / 60000);
-  if (mins < 1) return "just now";
-  if (mins < 60) return `${mins}m ago`;
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
-  const days = Math.floor(hrs / 24);
-  return `${days}d ago`;
-}
 
 function getNotificationIcon(type: string, meta?: string | null): { icon: LucideIcon; color: string } {
   switch (type) {
