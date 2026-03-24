@@ -10,9 +10,13 @@ import { startSlackPoller } from "./slack/poller.js";
 import { startDmPoller } from "./slack/dm-poller.js";
 import { startMRPoller } from "./integrations/source-control/poller.js";
 import { backfillTeamIds } from "./slack/backfill-team-ids.js";
+import { cleanupStaleAgents } from "./agents/bg-manager.js";
 
 // Run migrations
 migrate();
+
+// Mark any agents from a previous server run as failed
+cleanupStaleAgents();
 
 // Backfill team IDs and fix Slack deep links
 backfillTeamIds();

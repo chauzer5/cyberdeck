@@ -217,7 +217,7 @@ export function Sidebar() {
         ...(scEnabled ? [{ icon: GitMerge, label: "Source Control", href: "/source-control" } as const] : []),
         ...(linearEnabled ? [{ icon: LayoutList, label: "Linear", href: "/linear" } as const] : []),
         ...(slackEnabled ? [{ icon: MessageSquare, label: "Slack", href: "/slack" } as const] : []),
-        ...(agentsEnabled ? [{ icon: Bot, label: "Agent", href: "/agents" } as const] : []),
+        ...(agentsEnabled ? [{ icon: Bot, label: "Agents", href: "/agents" } as const] : []),
       ],
     },
     {

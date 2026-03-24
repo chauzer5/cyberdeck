@@ -262,5 +262,36 @@ export function migrate() {
     `);
   }
 
+  // Agents and agent messages tables
+  sqlite.exec(`
+    CREATE TABLE IF NOT EXISTS agents (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      prompt TEXT,
+      status TEXT NOT NULL DEFAULT 'running' CHECK(status IN ('running', 'waiting', 'completed', 'failed', 'stopped')),
+      mode TEXT NOT NULL DEFAULT 'background' CHECK(mode IN ('background', 'external')),
+      session_id TEXT,
+      model TEXT,
+      cwd TEXT,
+      pid INTEGER,
+      exit_code INTEGER,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS agent_messages (
+      id TEXT PRIMARY KEY,
+      agent_id TEXT NOT NULL,
+      role TEXT NOT NULL CHECK(role IN ('assistant', 'user', 'tool_use', 'tool_result')),
+      content TEXT NOT NULL,
+      tool_name TEXT,
+      is_error INTEGER,
+      created_at TEXT NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_agent_messages_agent_created
+      ON agent_messages(agent_id, created_at);
+  `);
+
   console.log("[db] migrations applied");
 }

@@ -59,6 +59,31 @@ export const notifications = sqliteTable("notifications", {
   createdAt: text("created_at").notNull(),
 });
 
+export const agents = sqliteTable("agents", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull(),
+  prompt: text("prompt"),
+  status: text("status", { enum: ["running", "waiting", "completed", "failed", "stopped"] }).notNull().default("running"),
+  mode: text("mode", { enum: ["background", "external"] }).notNull().default("background"),
+  sessionId: text("session_id"),
+  model: text("model"),
+  cwd: text("cwd"),
+  pid: integer("pid"),
+  exitCode: integer("exit_code"),
+  createdAt: text("created_at").notNull(),
+  updatedAt: text("updated_at").notNull(),
+});
+
+export const agentMessages = sqliteTable("agent_messages", {
+  id: text("id").primaryKey(),
+  agentId: text("agent_id").notNull(),
+  role: text("role", { enum: ["assistant", "user", "tool_use", "tool_result"] }).notNull(),
+  content: text("content").notNull(),
+  toolName: text("tool_name"),
+  isError: integer("is_error", { mode: "boolean" }),
+  createdAt: text("created_at").notNull(),
+});
+
 export const todos = sqliteTable("todos", {
   id: text("id").primaryKey(),
   source: text("source").notNull(),

@@ -5,6 +5,9 @@ export type WSEvent =
   | { type: "agent:exit"; agentId: string; code: number | null }
   | { type: "agent:turn_end"; agentId: string }
   | { type: "agent:renamed"; agentId: string; name: string }
+  | { type: "agent:text"; agentId: string; text: string }
+  | { type: "agent:tool_use"; agentId: string; toolName: string; input: string }
+  | { type: "agent:tool_result"; agentId: string; content: string; isError: boolean }
   | { type: "todo:updated"; todoId: string }
   | { type: "integration:sync"; integrationId: string }
   | { type: "slack:summary"; channelId: string; summaryId: string }
