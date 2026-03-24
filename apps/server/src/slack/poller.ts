@@ -14,8 +14,9 @@ export async function startSlackPoller() {
     return;
   }
   console.log(`[slack] poller started (auth mode: ${auth.mode})`);
-  pollAllChannels();
-  intervalId = setInterval(pollAllChannels, 5 * 60 * 1000);
+  // Delay first poll to let auth credentials fully initialize
+  setTimeout(pollAllChannels, 5000);
+  intervalId = setInterval(pollAllChannels, 60 * 1000);
 }
 
 export function stopSlackPoller() {

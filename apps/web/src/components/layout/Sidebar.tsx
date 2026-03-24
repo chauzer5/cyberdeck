@@ -19,7 +19,7 @@ import {
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { Link, useRouterState } from "@tanstack/react-router";
+import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import { useSlackEnabled } from "@/hooks/useSlackEnabled";
 import { useSourceControlEnabled } from "@/hooks/useSourceControlEnabled";
 import { useLinearEnabled } from "@/hooks/useLinearEnabled";
@@ -62,10 +62,22 @@ function getNotificationIcon(type: string, meta?: string | null): { icon: Lucide
   }
 }
 
+/** Map notification type to an in-app route */
+function getNotificationRoute(type: string): string | null {
+  switch (type) {
+    case "slack_unread": return "/slack";
+    case "mr_pipeline":
+    case "mr_approval": return "/source-control";
+    case "todo_created": return "/todos";
+    default: return null;
+  }
+}
+
 function NotificationsDropdown({ collapsed }: { collapsed: boolean }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const utils = trpc.useUtils();
+  const navigate = useNavigate();
 
   const notificationsQuery = trpc.notifications.list.useQuery(
     { limit: 20 },
@@ -147,7 +159,13 @@ function NotificationsDropdown({ collapsed }: { collapsed: boolean }) {
                   key={n.id}
                   onClick={() => {
                     if (!n.read) markRead.mutate({ id: n.id });
-                    if (n.url) window.open(n.url, "_blank");
+                    const route = getNotificationRoute(n.type);
+                    if (route) {
+                      navigate({ to: route });
+                      setOpen(false);
+                    } else if (n.url) {
+                      window.open(n.url, "_blank");
+                    }
                   }}
                   className={cn(
                     "flex cursor-pointer gap-3 border-b border-border/50 px-4 py-3 transition-colors hover:bg-[rgba(255,45,123,0.03)]",
