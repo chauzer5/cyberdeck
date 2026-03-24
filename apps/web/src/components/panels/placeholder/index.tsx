@@ -77,8 +77,6 @@ export function QuickStatsPanel() {
         color: "purple",
         href: "/source-control",
         value: String(myPRCount),
-        delta: needsReview > 0 ? `${needsReview} need review` : undefined,
-        deltaUp: needsReview > 0,
         icon: <GitMerge className="h-4 w-4" />,
       });
     }
@@ -101,8 +99,6 @@ export function QuickStatsPanel() {
         color: "cyan",
         href: "/slack",
         value: unreadCount != null ? String(unreadCount) : "--",
-        delta: unreadCount != null && unreadCount > 0 ? `${unreadCount} new` : undefined,
-        deltaUp: unreadCount != null && unreadCount > 0,
         icon: <MessageSquare className="h-4 w-4" />,
       });
     }
