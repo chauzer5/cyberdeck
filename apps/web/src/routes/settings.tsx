@@ -2,7 +2,6 @@ import { createRoute } from "@tanstack/react-router";
 import { rootRoute } from "./__root";
 import { useState, useEffect, useRef } from "react";
 import {
-  Settings,
   MessageSquare,
   GitMerge,
   LayoutList,
@@ -289,31 +288,7 @@ function AgentCwdSetting() {
 }
 
 function SettingsPage() {
-  const [slackModel, setSlackModel] = useState("");
-  const [saved, setSaved] = useState(false);
   const slack = useSlackEnabled();
-
-  const currentModel = trpc.settings.get.useQuery({ key: "slack.summarizationModel" });
-  const modelsQuery = {
-    isLoading: false,
-    data: [
-      {
-        provider: "Anthropic",
-        models: [
-          { id: "claude-opus-4-6", name: "Claude Opus 4.6" },
-          { id: "claude-sonnet-4-6", name: "Claude Sonnet 4.6" },
-          { id: "claude-haiku-4-5-20251001", name: "Claude Haiku 4.5" },
-        ],
-      },
-    ],
-  };
-
-  const setSetting = trpc.settings.set.useMutation({
-    onSuccess: () => {
-      setSaved(true);
-      setTimeout(() => setSaved(false), 2000);
-    },
-  });
 
   const { theme, setTheme } = useTheme();
   const testGitLab = trpc.sourceControl.testGitLab.useMutation();
@@ -334,17 +309,6 @@ function SettingsPage() {
       utils.settings.get.invalidate();
     },
   });
-
-  useEffect(() => {
-    if (currentModel.data !== undefined) {
-      setSlackModel(currentModel.data ?? "");
-    }
-  }, [currentModel.data]);
-
-  function handleModelChange(value: string) {
-    setSlackModel(value);
-    setSetting.mutate({ key: "slack.summarizationModel", value });
-  }
 
   return (
     <div className="flex h-full flex-col">
@@ -505,7 +469,7 @@ function SettingsPage() {
 
           {/* Slack section */}
           <section className="rounded-xl border border-border bg-card">
-            <div className="flex items-center gap-2.5 border-b border-border px-5 py-3.5">
+            <div className="flex items-center gap-2.5 px-5 py-3.5">
               <MessageSquare className="h-4 w-4 text-neon-pink" />
               <h2 className="text-sm font-semibold text-cream">Slack</h2>
               <div className="ml-auto flex items-center gap-2">
@@ -524,53 +488,6 @@ function SettingsPage() {
                     <ToggleLeft className="h-5 w-5" />
                   )}
                 </button>
-              </div>
-            </div>
-
-            <div className="space-y-5 p-5">
-              {/* Model selector */}
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <label className="text-xs font-semibold text-cream">
-                      Summarization Model
-                    </label>
-                    <p className="mt-0.5 text-[11px] text-text-muted">
-                      Model used to summarize Slack conversations and generate headlines
-                    </p>
-                  </div>
-                  {saved && (
-                    <span className="flex items-center gap-1 text-[11px] font-medium text-neon-pink">
-                      <Check className="h-3 w-3" />
-                      Saved
-                    </span>
-                  )}
-                  {setSetting.isPending && (
-                    <Loader2 className="h-3.5 w-3.5 animate-spin text-text-muted" />
-                  )}
-                </div>
-
-                <select
-                  value={slackModel}
-                  onChange={(e) => handleModelChange(e.target.value)}
-                  disabled={modelsQuery.isLoading}
-                  className={cn(
-                    "w-full rounded-lg border border-border bg-[rgba(0,0,0,0.3)] px-3 py-2 font-mono text-xs text-cream transition-colors",
-                    "focus:border-neon-pink focus:outline-none",
-                    "disabled:opacity-50"
-                  )}
-                >
-                  <option value="">Default model</option>
-                  {modelsQuery.data?.map((provider) => (
-                    <optgroup key={provider.provider} label={provider.provider}>
-                      {provider.models.map((m) => (
-                        <option key={`${provider.provider}/${m.id}`} value={`${provider.provider}/${m.id}`}>
-                          {m.name}
-                        </option>
-                      ))}
-                    </optgroup>
-                  ))}
-                </select>
               </div>
             </div>
           </section>
