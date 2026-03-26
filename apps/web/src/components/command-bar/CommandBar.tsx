@@ -162,6 +162,10 @@ export function CommandBar({ onClose }: CommandBarProps) {
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Search pages, MRs, issues, agents..."
+              autoCorrect="off"
+              autoCapitalize="off"
+              autoComplete="off"
+              spellCheck={false}
               className="flex-1 bg-transparent text-sm text-cream placeholder:text-text-muted/50 outline-none"
             />
             {query && (

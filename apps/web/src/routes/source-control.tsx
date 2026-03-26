@@ -496,7 +496,7 @@ function GitHubDetailView({
 
 // ── Main Page ──
 
-type Tab = "mine" | "team" | "review";
+type Tab = "mine" | "team" | "other" | "review";
 type SelectedPR = { provider: "github"; repo: string; number: number } | { provider: "gitlab"; projectId: number; iid: number };
 
 /** Parse a PR URL param like "gitlab:123:45" or "github:owner/repo:67" */
@@ -568,11 +568,12 @@ function SourceControlPage() {
   });
   const teamConfigured = teamMembers && teamMembers.length > 0;
 
-  const { myPRs, teamPRs, reviewPRs } = useMemo(() => {
-    if (!allPRs) return { myPRs: [], teamPRs: [], reviewPRs: [] };
+  const { myPRs, teamPRs, otherPRs, reviewPRs } = useMemo(() => {
+    if (!allPRs) return { myPRs: [], teamPRs: [], otherPRs: [], reviewPRs: [] };
     return {
       myPRs: allPRs.filter((pr) => pr.is_mine),
       teamPRs: allPRs.filter((pr) => pr.is_team_member),
+      otherPRs: allPRs.filter((pr) => !pr.is_mine && !pr.is_team_member),
       reviewPRs: allPRs.filter((pr) => pr.needs_your_review),
     };
   }, [allPRs]);
@@ -582,7 +583,9 @@ function SourceControlPage() {
       ? myPRs
       : tab === "team"
         ? teamPRs
-        : reviewPRs;
+        : tab === "other"
+          ? otherPRs
+          : reviewPRs;
 
   if (selectedPR) {
     if (selectedPR.provider === "gitlab") {
@@ -658,6 +661,7 @@ function SourceControlPage() {
         {([
           { key: "mine" as Tab, label: "Mine", count: myPRs.length },
           { key: "team" as Tab, label: "Team", count: teamPRs.length },
+          { key: "other" as Tab, label: "Other", count: otherPRs.length },
           { key: "review" as Tab, label: "Needs Review", count: reviewPRs.length },
         ] as const).map((t) => (
           <button
@@ -735,7 +739,7 @@ function SourceControlPage() {
               <div className="flex items-center justify-center pt-12">
                 <div className="text-center">
                   <GitPullRequest className="mx-auto h-10 w-10 text-text-muted opacity-30" />
-                  <p className="mt-3 text-sm text-text-muted">No pull requests</p>
+                  <p className="mt-3 text-sm text-text-muted">No merge requests</p>
                 </div>
               </div>
             )}
@@ -765,7 +769,7 @@ function SourceControlPage() {
               <div className="flex items-center justify-center pt-16">
                 <div className="text-center">
                   <GitPullRequest className="mx-auto h-10 w-10 text-text-muted opacity-30" />
-                  <p className="mt-3 text-sm text-text-muted">No pull requests</p>
+                  <p className="mt-3 text-sm text-text-muted">No merge requests</p>
                 </div>
               </div>
             )}

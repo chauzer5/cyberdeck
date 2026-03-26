@@ -87,6 +87,47 @@ async function getChannelList(teamId?: string | null): Promise<ChannelEntry[]> {
 
 const USER_CACHE_TTL = 30 * 24 * 60 * 60 * 1000; // 30 days
 
+// ── Usergroup (subteam) Cache ──────────────────────────────────────────────
+
+const usergroupCache = new Map<string, Map<string, string>>(); // teamId -> (groupId -> handle)
+let usergroupCacheTime = 0;
+const USERGROUP_CACHE_TTL = 60 * 60 * 1000; // 1 hour
+
+async function resolveUsergroupNames(
+  groupIds: string[],
+  teamId?: string | null,
+): Promise<Map<string, string>> {
+  if (groupIds.length === 0) return new Map();
+
+  const cacheKey = teamId ?? "__default__";
+
+  // Refresh cache if stale
+  if (Date.now() - usergroupCacheTime > USERGROUP_CACHE_TTL || !usergroupCache.has(cacheKey)) {
+    try {
+      const slack = getSlackClient(teamId);
+      console.log(`[slack:api] usergroups.list`);
+      const resp = await slack.usergroups.list({ include_disabled: false });
+      const map = new Map<string, string>();
+      for (const ug of resp.usergroups ?? []) {
+        if (ug.id && ug.handle) {
+          map.set(ug.id, `@${ug.handle}`);
+        }
+      }
+      usergroupCache.set(cacheKey, map);
+      usergroupCacheTime = Date.now();
+    } catch (err) {
+      console.warn("[slack] failed to fetch usergroups:", err);
+    }
+  }
+
+  const cached = usergroupCache.get(cacheKey) ?? new Map();
+  const result = new Map<string, string>();
+  for (const id of groupIds) {
+    result.set(id, cached.get(id) ?? `@unknown-group`);
+  }
+  return result;
+}
+
 async function resolveUserNames(
   userIds: string[],
   teamId?: string | null
@@ -341,9 +382,22 @@ export async function fetchChannelMessages(
     const allIds = [...new Set([...userIds, ...mentionIds])];
     const nameMap = await resolveUserNames(allIds, teamId);
 
+    // Resolve usergroup (subteam) mentions
+    const subteamIds = new Set<string>();
+    for (const m of messages) {
+      for (const match of m.text.matchAll(/<!subteam\^(S[A-Z0-9]+)(?:\|[^>]*)?>/g)) {
+        subteamIds.add(match[1]);
+      }
+    }
+    const subteamMap = await resolveUsergroupNames([...subteamIds], teamId);
+
     for (const m of messages) {
       m.user = nameMap.get(m.user) ?? m.user;
       m.text = m.text.replace(/<@(U[A-Z0-9]+)>/g, (_, id) => `@${nameMap.get(id) ?? id}`);
+      m.text = m.text.replace(/<!subteam\^(S[A-Z0-9]+)(?:\|[^>]*)?>/g, (_, id) => subteamMap.get(id) ?? `@unknown-group`);
+      m.text = m.text.replace(/<!here>/g, "@here");
+      m.text = m.text.replace(/<!channel>/g, "@channel");
+      m.text = m.text.replace(/<!everyone>/g, "@everyone");
     }
 
     return messages;
