@@ -28,13 +28,50 @@ interface TextMessage {
   content: string;
 }
 
+interface QuestionOption {
+  label: string;
+  description?: string;
+}
+
+interface ParsedQuestion {
+  question: string;
+  header?: string;
+  options?: QuestionOption[];
+  multiSelect?: boolean;
+}
+
 interface QuestionMessage {
   kind: "question";
   id: string;
-  question: string;
+  questions: ParsedQuestion[];
 }
 
 type ChatBlock = ToolGroup | TextMessage | QuestionMessage;
+
+/** Parse AskUserQuestion tool input into structured questions */
+function parseQuestionContent(content: string): ParsedQuestion[] {
+  try {
+    const parsed = JSON.parse(content);
+
+    // Format: { questions: [{ question, header, options, multiSelect }] }
+    if (parsed.questions && Array.isArray(parsed.questions)) {
+      return parsed.questions;
+    }
+
+    // Format: { question: "..." } or { question: "...", options: [...] }
+    if (parsed.question) {
+      return [parsed];
+    }
+
+    // Format: { text: "..." }
+    if (parsed.text) {
+      return [{ question: parsed.text }];
+    }
+  } catch { /* not JSON */ }
+
+  // Plain text question
+  return [{ question: content }];
+}
 
 /** Group consecutive tool_use/tool_result messages into collapsible blocks */
 function groupMessages(
@@ -48,6 +85,7 @@ function groupMessages(
 ): ChatBlock[] {
   const blocks: ChatBlock[] = [];
   let currentToolGroup: ToolGroup | null = null;
+  let skipNextToolResult = false;
 
   for (const msg of messages) {
     if (msg.role === "tool_use" && msg.toolName === "AskUserQuestion") {
@@ -56,20 +94,32 @@ function groupMessages(
         blocks.push(currentToolGroup);
         currentToolGroup = null;
       }
-      // Extract question text from the tool input JSON
-      let question = msg.content;
-      try {
-        const parsed = JSON.parse(msg.content);
-        question = parsed.question || parsed.text || msg.content;
-      } catch { /* use raw content */ }
-      blocks.push({ kind: "question", id: msg.id, question });
-      // Skip the next tool_result for AskUserQuestion (it's a default/empty response)
+
+      const questions = parseQuestionContent(msg.content);
+
+      // Deduplicate: if the last block is a question with the same content, skip
+      const lastBlock = blocks[blocks.length - 1];
+      if (lastBlock?.kind === "question") {
+        const prevContent = JSON.stringify(lastBlock.questions);
+        const thisContent = JSON.stringify(questions);
+        if (prevContent === thisContent) {
+          skipNextToolResult = true;
+          continue;
+        }
+      }
+
+      blocks.push({ kind: "question", id: msg.id, questions });
+      skipNextToolResult = true;
       continue;
     }
-    if (msg.role === "tool_result" && currentToolGroup === null) {
-      // Orphaned tool_result (e.g. from skipped AskUserQuestion) — ignore
+
+    if (skipNextToolResult && msg.role === "tool_result") {
+      // Skip the tool_result for AskUserQuestion (default/empty response)
+      skipNextToolResult = false;
       continue;
     }
+    skipNextToolResult = false;
+
     if (msg.role === "tool_use" || msg.role === "tool_result") {
       if (!currentToolGroup) {
         currentToolGroup = { kind: "tool_group", id: msg.id, items: [] };
@@ -165,10 +215,11 @@ export function AgentChat({ agentId }: AgentChatProps) {
     }
   }, [blocks.length, streamingText]);
 
-  function handleSend() {
-    const msg = input.trim();
+  function handleSend(message?: string) {
+    const msg = (message ?? input).trim();
     if (!msg || !canRespond) return;
     respond.mutate({ id: agentId, message: msg });
+    if (!message) setInput("");
   }
 
   function toggleGroup(id: string) {
@@ -216,18 +267,45 @@ export function AgentChat({ agentId }: AgentChatProps) {
 
           if (block.kind === "question") {
             return (
-              <div key={block.id} className="max-w-[90%]">
-                <div className="flex items-start gap-3 rounded-xl border border-neon-cyan/30 bg-neon-cyan/[0.06] px-4 py-3">
-                  <HelpCircle className="mt-0.5 h-5 w-5 shrink-0 text-neon-cyan" />
-                  <div>
-                    <p className="text-[10px] font-semibold uppercase tracking-wider text-neon-cyan/70 mb-1">
-                      Agent has a question
-                    </p>
-                    <pre className="whitespace-pre-wrap font-sans text-sm text-cream leading-relaxed">
-                      {block.question}
-                    </pre>
+              <div key={block.id} className="max-w-[90%] space-y-3">
+                {block.questions.map((q, qi) => (
+                  <div
+                    key={qi}
+                    className="rounded-xl border border-neon-cyan/30 bg-neon-cyan/[0.06] px-4 py-3"
+                  >
+                    <div className="flex items-start gap-3">
+                      <HelpCircle className="mt-0.5 h-5 w-5 shrink-0 text-neon-cyan" />
+                      <div className="flex-1 min-w-0">
+                        {q.header && (
+                          <p className="text-[10px] font-semibold uppercase tracking-wider text-neon-cyan/70 mb-1">
+                            {q.header}
+                          </p>
+                        )}
+                        <p className="text-sm text-cream leading-relaxed">{q.question}</p>
+
+                        {q.options && q.options.length > 0 && (
+                          <div className="mt-3 space-y-2">
+                            {q.options.map((opt, oi) => (
+                              <button
+                                key={oi}
+                                onClick={() => handleSend(opt.label)}
+                                disabled={!canRespond || respond.isPending}
+                                className="w-full text-left rounded-lg border border-neon-cyan/20 bg-neon-cyan/[0.04] px-3 py-2 transition-colors hover:bg-neon-cyan/[0.12] hover:border-neon-cyan/40 disabled:opacity-40 disabled:cursor-not-allowed"
+                              >
+                                <p className="text-sm font-medium text-neon-cyan">{opt.label}</p>
+                                {opt.description && (
+                                  <p className="mt-0.5 text-xs text-text-muted leading-relaxed">
+                                    {opt.description}
+                                  </p>
+                                )}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
                   </div>
-                </div>
+                ))}
               </div>
             );
           }
@@ -367,7 +445,7 @@ export function AgentChat({ agentId }: AgentChatProps) {
               }}
             />
             <button
-              onClick={handleSend}
+              onClick={() => handleSend()}
               disabled={!input.trim() || respond.isPending}
               className="rounded-lg bg-neon-pink/20 p-2 text-neon-pink transition-colors hover:bg-neon-pink/30 disabled:opacity-30"
             >
