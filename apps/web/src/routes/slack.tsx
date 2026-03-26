@@ -294,10 +294,10 @@ function SlackPage() {
           <button
             onClick={() => pollNow.mutate()}
             disabled={pollNow.isPending}
-            className="flex items-center gap-1.5 rounded-lg border border-border bg-transparent px-3.5 py-[7px] text-xs font-medium text-text-secondary transition-all hover:border-border-hover hover:bg-[rgba(255,45,123,0.06)] disabled:opacity-50"
+            className="flex items-center gap-1.5 rounded-lg border border-border bg-transparent px-3.5 py-[7px] text-xs font-medium text-text-secondary hover:border-border-hover hover:bg-[rgba(255,45,123,0.06)] disabled:pointer-events-none"
           >
             <RefreshCw className={cn("h-3.5 w-3.5", pollNow.isPending && "animate-spin")} />
-            Sync
+            {pollNow.isPending ? "Syncing…" : "Sync"}
           </button>
         </div>
       </div>

@@ -353,6 +353,10 @@ export async function getPullRequests(): Promise<EnrichedPullRequest[]> {
   return enriched;
 }
 
+export function bustPRCache() {
+  prCacheTime = 0;
+}
+
 export async function getPRDetail(repo: string, prNumber: number): Promise<PRDetail> {
   const token = await getToken();
 

@@ -11,6 +11,7 @@ import {
   Users,
   Settings,
   Check,
+  Play,
 } from "lucide-react";
 import { trpc } from "@/trpc";
 import { cn, timeAgo } from "@/lib/utils";
@@ -86,47 +87,66 @@ interface LinearIssue {
 
 // ── Issue Card ──
 
-function IssueCard({ issue, onOpen }: { issue: LinearIssue; onOpen: (id: string) => void }) {
+function IssueCard({ issue, onOpen, onStart, starting }: { issue: LinearIssue; onOpen: (id: string) => void; onStart?: (issueId: string) => void; starting?: boolean }) {
   return (
-    <button
-      onClick={() => onOpen(issue.identifier)}
-      className="w-full text-left rounded-lg border border-border bg-[rgba(255,45,123,0.02)] px-3.5 py-3 transition-all hover:border-border-hover hover:bg-[rgba(255,45,123,0.04)]"
-    >
-      <div className="flex items-center gap-2">
-        <span className="text-[10px] font-mono text-neon-pink">{issue.identifier}</span>
-        <span className={cn("rounded-full px-1.5 py-0.5 text-[9px] font-semibold", getStatusColor(issue.status_type))}>
-          {issue.status}
-        </span>
-      </div>
-      <div className="mt-1 text-xs font-medium text-cream">{issue.title}</div>
-      <div className="mt-1.5 flex items-center gap-1.5 text-[10px] text-text-muted">
-        {issue.priority > 0 && (
-          <>
-            <span className={cn("rounded-full px-1.5 py-0.5 text-[9px] font-semibold", getPriorityColor(issue.priority))}>
-              {getPriorityLabel(issue.priority)}
-            </span>
-            <span>·</span>
-          </>
-        )}
-        <span>{issue.assignee ?? "Unassigned"}</span>
-        <span>·</span>
-        <span>{issue.team_key}</span>
-        <span>·</span>
-        <span>{timeAgo(issue.updated_at)}</span>
-      </div>
-      {issue.labels.length > 0 && (
-        <div className="mt-1.5 flex flex-wrap gap-1">
-          {issue.labels.map((label) => (
-            <span
-              key={label}
-              className="rounded-full bg-[rgba(139,92,246,0.12)] px-1.5 py-0.5 text-[9px] font-semibold text-neon-purple"
-            >
-              {label}
-            </span>
-          ))}
+    <div className="flex items-center gap-2 rounded-lg border border-border bg-[rgba(255,45,123,0.02)] px-3.5 py-3 transition-all hover:border-border-hover hover:bg-[rgba(255,45,123,0.04)]">
+      <button
+        onClick={() => onOpen(issue.identifier)}
+        className="min-w-0 flex-1 text-left"
+      >
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] font-mono text-neon-pink">{issue.identifier}</span>
+          <span className={cn("rounded-full px-1.5 py-0.5 text-[9px] font-semibold", getStatusColor(issue.status_type))}>
+            {issue.status}
+          </span>
         </div>
+        <div className="mt-1 text-xs font-medium text-cream">{issue.title}</div>
+        <div className="mt-1.5 flex items-center gap-1.5 text-[10px] text-text-muted">
+          {issue.priority > 0 && (
+            <>
+              <span className={cn("rounded-full px-1.5 py-0.5 text-[9px] font-semibold", getPriorityColor(issue.priority))}>
+                {getPriorityLabel(issue.priority)}
+              </span>
+              <span>·</span>
+            </>
+          )}
+          <span>{issue.assignee ?? "Unassigned"}</span>
+          <span>·</span>
+          <span>{issue.team_key}</span>
+          <span>·</span>
+          <span>{timeAgo(issue.updated_at)}</span>
+        </div>
+        {issue.labels.length > 0 && (
+          <div className="mt-1.5 flex flex-wrap gap-1">
+            {issue.labels.map((label) => (
+              <span
+                key={label}
+                className="rounded-full bg-[rgba(139,92,246,0.12)] px-1.5 py-0.5 text-[9px] font-semibold text-neon-purple"
+              >
+                {label}
+              </span>
+            ))}
+          </div>
+        )}
+      </button>
+      {onStart && (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onStart(issue.id);
+          }}
+          disabled={starting}
+          className="flex shrink-0 items-center gap-1.5 rounded-lg border border-border bg-[rgba(0,255,136,0.08)] px-3 py-1.5 text-[11px] font-medium text-neon-green transition-colors hover:bg-[rgba(0,255,136,0.15)] disabled:opacity-50"
+        >
+          {starting ? (
+            <Loader2 className="h-3 w-3 animate-spin" />
+          ) : (
+            <Play className="h-3 w-3" />
+          )}
+          Start
+        </button>
       )}
-    </button>
+    </div>
   );
 }
 
@@ -420,7 +440,6 @@ function LinearPage() {
   }, [issueParam, navTo]);
   const [showTeamSetup, setShowTeamSetup] = useState(false);
   const [showBoardPicker, setShowBoardPicker] = useState(false);
-  const [syncing, setSyncing] = useState(false);
   const { data: allIssues, isLoading, isError, refetch } = trpc.linear.issues.useQuery(
     undefined,
     { refetchInterval: 30_000 },
@@ -431,18 +450,25 @@ function LinearPage() {
   );
   const { data: teamMembers } = trpc.team.members.useQuery();
   const utils = trpc.useUtils();
+  const syncMutation = trpc.linear.sync.useMutation({
+    onSuccess: () => {
+      utils.linear.issues.invalidate();
+      utils.linear.readyIssues.invalidate();
+    },
+  });
+  const [startingTicketId, setStartingTicketId] = useState<string | null>(null);
+  const startTicketMutation = trpc.linear.startTicket.useMutation({
+    onSuccess: () => {
+      setStartingTicketId(null);
+      utils.linear.issues.invalidate();
+      utils.linear.readyIssues.invalidate();
+      setTab("mine");
+    },
+    onError: () => {
+      setStartingTicketId(null);
+    },
+  });
 
-  const handleSync = useCallback(async () => {
-    setSyncing(true);
-    try {
-      await Promise.all([
-        utils.linear.issues.invalidate(),
-        utils.linear.readyIssues.invalidate(),
-      ]);
-    } finally {
-      setSyncing(false);
-    }
-  }, [utils]);
   const teamConfigured = teamMembers && teamMembers.length > 0;
   const readyTeamId = trpc.settings.get.useQuery({ key: "linear.readyTeamId" });
   const readyBoardConfigured = !!readyTeamId.data;
@@ -486,15 +512,12 @@ function LinearPage() {
           <p className="mt-0.5 text-xs text-text-muted">Issues and tickets</p>
         </div>
         <button
-          onClick={handleSync}
-          disabled={syncing}
-          className={cn(
-            "flex items-center gap-1.5 rounded-lg border border-border bg-transparent px-3.5 py-[7px] text-xs font-medium text-text-secondary transition-all hover:border-border-hover hover:bg-[rgba(255,45,123,0.06)]",
-            syncing && "pointer-events-none opacity-60"
-          )}
+          onClick={() => syncMutation.mutate()}
+          disabled={syncMutation.isPending}
+          className="flex items-center gap-1.5 rounded-lg border border-border bg-transparent px-3.5 py-[7px] text-xs font-medium text-text-secondary hover:border-border-hover hover:bg-[rgba(255,45,123,0.06)] disabled:pointer-events-none"
         >
-          <RefreshCw className={cn("h-3.5 w-3.5", syncing && "animate-spin")} />
-          {syncing ? "Syncing…" : "Sync"}
+          <RefreshCw className={cn("h-3.5 w-3.5", syncMutation.isPending && "animate-spin")} />
+          {syncMutation.isPending ? "Syncing…" : "Sync"}
         </button>
       </div>
 
@@ -633,7 +656,15 @@ function LinearPage() {
             <div className="space-y-2">
               {readyIssues.map((issue, i) => (
                 <div key={issue.id} className={cn("animate-glass-in", `stagger-${Math.min(i + 1, 5)}`)}>
-                  <IssueCard issue={issue} onOpen={setSelectedIssue} />
+                  <IssueCard
+                    issue={issue}
+                    onOpen={setSelectedIssue}
+                    onStart={(issueId) => {
+                      setStartingTicketId(issueId);
+                      startTicketMutation.mutate({ issueId });
+                    }}
+                    starting={startingTicketId === issue.id}
+                  />
                 </div>
               ))}
             </div>

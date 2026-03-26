@@ -146,10 +146,8 @@ export const slackRouter = router({
     return getUnreadDmDetails();
   }),
 
-  pollNow: publicProcedure.mutation(() => {
-    pollAllChannels().catch((err) =>
-      console.error("[slack] background poll error:", err)
-    );
+  pollNow: publicProcedure.mutation(async () => {
+    await pollAllChannels();
     return { ok: true };
   }),
 

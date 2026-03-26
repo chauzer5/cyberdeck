@@ -66,12 +66,21 @@ export function TodoPanel() {
     >
       {count === 0 && !showNewForm ? (
         <p className="text-xs text-text-muted">
-          No todos yet. Click &quot;New Todo&quot; to get started.
+          No todos yet. Click + to get started.
         </p>
       ) : (
-        <ul className="flex h-full flex-col gap-2 overflow-y-auto">
+        <div className="flex h-full flex-col gap-2 overflow-y-auto">
+          {showNewForm && (
+            <NewTodoInput
+              onSubmit={(title) => {
+                createMutation.mutate({ title, source: "manual" });
+                setShowNewForm(false);
+              }}
+              onCancel={() => setShowNewForm(false)}
+            />
+          )}
           {todos.map((todo, i) => (
-            <li
+            <div
               key={todo.id}
               onClick={() => navigate({ to: "/todos", search: { todoId: todo.id } })}
               className={cn(
@@ -105,12 +114,11 @@ export function TodoPanel() {
                   </button>
                 </div>
               </div>
-            </li>
+            </div>
           ))}
-        </ul>
+        </div>
       )}
-
-      {showNewForm && (
+      {count === 0 && showNewForm && (
         <NewTodoInput
           onSubmit={(title) => {
             createMutation.mutate({ title, source: "manual" });
@@ -178,7 +186,7 @@ function NewTodoInput({
       }}
       onBlur={onCancel}
       placeholder="What needs to be done?"
-      className="mt-2 w-full rounded-lg border border-border bg-[rgba(255,45,123,0.04)] px-3 py-2 text-xs text-cream placeholder:text-text-muted focus:border-neon-pink focus:outline-none"
+      className="w-full rounded-lg border border-border bg-[rgba(255,45,123,0.04)] px-3 py-2 text-xs text-cream placeholder:text-text-muted focus:border-neon-pink focus:outline-none"
     />
   );
 }

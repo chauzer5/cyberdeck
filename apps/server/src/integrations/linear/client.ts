@@ -104,6 +104,11 @@ let cachedReadyIssues: LinearIssue[] = [];
 let readyIssuesCacheTime = 0;
 const LINEAR_CACHE_TTL = 60_000; // 60s
 
+export function bustLinearCache() {
+  issuesCacheTime = 0;
+  readyIssuesCacheTime = 0;
+}
+
 // ── Public API ──
 
 export async function getIssues(): Promise<LinearIssue[]> {
@@ -386,6 +391,43 @@ export async function getReadyIssues(): Promise<LinearIssue[]> {
   readyIssuesCacheTime = Date.now();
 
   return result;
+}
+
+export async function startTicket(issueId: string): Promise<boolean> {
+  const apiKey = await getApiKey();
+
+  // Get viewer ID
+  const viewer = await linearQuery<{ viewer: { id: string } }>(
+    apiKey,
+    `{ viewer { id } }`,
+  );
+
+  // Get the issue's team to find the "In Progress" state
+  const issueData = await linearQuery<{
+    issue: { team: { id: string; states: { nodes: { id: string; name: string; type: string }[] } } };
+  }>(
+    apiKey,
+    `{ issue(id: "${issueId}") { team { id states { nodes { id name type } } } } }`,
+  );
+
+  const inProgressState = issueData.issue.team.states.nodes.find(
+    (s) => s.name === "In Progress" || (s.type === "started" && s.name.toLowerCase().includes("progress")),
+  );
+  if (!inProgressState) {
+    throw new Error("Could not find 'In Progress' state for this team");
+  }
+
+  // Assign to self and move to In Progress
+  const result = await linearQuery<{ issueUpdate: { success: boolean } }>(
+    apiKey,
+    `mutation { issueUpdate(id: "${issueId}", input: { assigneeId: "${viewer.viewer.id}", stateId: "${inProgressState.id}" }) { success } }`,
+  );
+
+  // Bust caches so the UI reflects changes immediately
+  issuesCacheTime = 0;
+  readyIssuesCacheTime = 0;
+
+  return result.issueUpdate.success;
 }
 
 export async function testConnection(): Promise<string> {

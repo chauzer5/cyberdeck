@@ -353,6 +353,10 @@ export async function getMergeRequests(): Promise<EnrichedMergeRequest[]> {
   return enriched;
 }
 
+export function bustMRCache() {
+  mrCacheTime = 0;
+}
+
 export async function getMRDetail(projectId: number, mrIid: number): Promise<MRDetail> {
   const token = await getToken();
   const base = `/projects/${projectId}/merge_requests/${mrIid}`;

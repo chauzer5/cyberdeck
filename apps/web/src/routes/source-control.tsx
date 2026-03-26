@@ -530,7 +530,6 @@ function SourceControlPage() {
     }
   }, [prParam, navigate]);
   const [showTeamSetup, setShowTeamSetup] = useState(false);
-  const [syncing, setSyncing] = useState(false);
   const autoMergeTodoQuery = trpc.settings.get.useQuery({ key: "sourceControl.autoMergeTodo" });
   const autoMergeTodoEnabled = autoMergeTodoQuery.data === "true";
   const setSetting = trpc.settings.set.useMutation({
@@ -564,14 +563,9 @@ function SourceControlPage() {
     });
   }, [spawnAgent]);
 
-  const handleSync = useCallback(async () => {
-    setSyncing(true);
-    try {
-      await utils.sourceControl.pullRequests.invalidate();
-    } finally {
-      setSyncing(false);
-    }
-  }, [utils]);
+  const syncMutation = trpc.sourceControl.sync.useMutation({
+    onSuccess: () => utils.sourceControl.pullRequests.invalidate(),
+  });
   const teamConfigured = teamMembers && teamMembers.length > 0;
 
   const { myPRs, teamPRs, reviewPRs } = useMemo(() => {
@@ -649,15 +643,12 @@ function SourceControlPage() {
             </button>
           </label>
         <button
-          onClick={handleSync}
-          disabled={syncing}
-          className={cn(
-            "flex items-center gap-1.5 rounded-lg border border-border bg-transparent px-3.5 py-[7px] text-xs font-medium text-text-secondary transition-all hover:border-border-hover hover:bg-[rgba(255,45,123,0.06)]",
-            syncing && "pointer-events-none opacity-60"
-          )}
+          onClick={() => syncMutation.mutate()}
+          disabled={syncMutation.isPending}
+          className="flex items-center gap-1.5 rounded-lg border border-border bg-transparent px-3.5 py-[7px] text-xs font-medium text-text-secondary hover:border-border-hover hover:bg-[rgba(255,45,123,0.06)] disabled:pointer-events-none"
         >
-          <RefreshCw className={cn("h-3.5 w-3.5", syncing && "animate-spin")} />
-          {syncing ? "Syncing…" : "Sync"}
+          <RefreshCw className={cn("h-3.5 w-3.5", syncMutation.isPending && "animate-spin")} />
+          {syncMutation.isPending ? "Syncing…" : "Sync"}
         </button>
         </div>
       </div>

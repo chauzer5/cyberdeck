@@ -11,6 +11,7 @@ import {
   playJob as playGitLabJob,
   retryJob as retryGitLabJob,
   testConnection as testGitLabConnection,
+  bustMRCache as bustGitLabCache,
 } from "../gitlab/client.js";
 import type { EnrichedMergeRequest, MRDetail } from "../gitlab/client.js";
 import {
@@ -20,6 +21,7 @@ import {
   addComment as addGitHubComment,
   rerunCheck as rerunGitHubCheck,
   testConnection as testGitHubConnection,
+  bustPRCache as bustGitHubCache,
 } from "../github/client.js";
 import type { EnrichedPullRequest, PRDetail } from "../github/client.js";
 
@@ -110,6 +112,25 @@ async function isGitHubConfigured(): Promise<boolean> {
 // ── Router ──
 
 export const sourceControlRouter = router({
+  sync: publicProcedure.mutation(async () => {
+    bustGitLabCache();
+    bustGitHubCache();
+    // Re-fetch fresh data from APIs
+    const [gitlabOk, githubOk] = await Promise.all([
+      isGitLabConfigured(),
+      isGitHubConfigured(),
+    ]);
+    const settled = await Promise.allSettled([
+      gitlabOk ? getGitLabMRs() : Promise.resolve([]),
+      githubOk ? getGitHubPRs() : Promise.resolve([]),
+    ]);
+    let count = 0;
+    for (const r of settled) {
+      if (r.status === "fulfilled") count += r.value.length;
+    }
+    return { ok: true, count };
+  }),
+
   pullRequests: publicProcedure.query(async () => {
     const [gitlabOk, githubOk] = await Promise.all([
       isGitLabConfigured(),
