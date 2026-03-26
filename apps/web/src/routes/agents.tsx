@@ -166,21 +166,35 @@ function AgentsPage() {
   }
 
   return (
-    <div className="flex h-full">
+    <div className="flex h-full flex-col">
+      {/* Page header */}
+      <div className="flex items-center justify-between border-b border-border px-6 py-4">
+        <div>
+          <h1 className="font-display text-lg font-bold tracking-[2px] uppercase text-cream">Agents</h1>
+          <p className="mt-0.5 text-xs text-text-muted">
+            {agentsList.filter((a) => a.status === "running").length} running · {agentsList.length} total
+          </p>
+        </div>
+        <button
+          onClick={() => setShowNewForm(!showNewForm)}
+          className="flex items-center gap-1.5 rounded-lg border border-[rgba(255,45,123,0.2)] bg-[rgba(255,45,123,0.06)] px-3.5 py-[7px] text-xs font-medium text-neon-pink transition-all hover:bg-[rgba(255,45,123,0.1)]"
+        >
+          <Plus className="h-3.5 w-3.5" />
+          New Agent
+        </button>
+      </div>
+
+      <div className="flex flex-1 min-h-0">
       {/* Left pane — agent list */}
       <div className="flex w-72 shrink-0 flex-col border-r border-border">
-        {/* Header */}
-        <div className="flex items-center justify-between border-b border-border px-4 py-3">
-          <h2 className="font-display text-sm font-bold tracking-wider uppercase text-cream">
-            Agents
-          </h2>
-          <button
-            onClick={() => setShowNewForm(!showNewForm)}
-            className="rounded-lg bg-neon-pink/15 p-1.5 text-neon-pink transition-colors hover:bg-neon-pink/25"
-          >
-            <Plus className="h-4 w-4" />
-          </button>
-        </div>
+        {/* New agent button */}
+        <button
+          onClick={() => setShowNewForm(!showNewForm)}
+          className="flex w-full items-center justify-center gap-1.5 border-b border-border px-4 py-2.5 text-xs font-medium text-neon-pink transition-colors hover:bg-[rgba(255,45,123,0.06)]"
+        >
+          <Plus className="h-3.5 w-3.5" />
+          New Agent
+        </button>
 
         {/* New agent form */}
         {showNewForm && (
@@ -340,6 +354,7 @@ function AgentsPage() {
             <p className="text-sm">Select an agent or create a new one</p>
           </div>
         )}
+      </div>
       </div>
     </div>
   );
