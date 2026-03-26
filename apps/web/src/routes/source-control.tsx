@@ -1,6 +1,6 @@
-import { createRoute, useNavigate } from "@tanstack/react-router";
+import { createRoute, useNavigate, useSearch } from "@tanstack/react-router";
 import { rootRoute } from "./__root";
-import { useState, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import {
   GitPullRequest,
   ArrowLeft,
@@ -487,9 +487,36 @@ function GitHubDetailView({
 type Tab = "mine" | "team" | "review";
 type SelectedPR = { provider: "github"; repo: string; number: number } | { provider: "gitlab"; projectId: number; iid: number };
 
+/** Parse a PR URL param like "gitlab:123:45" or "github:owner/repo:67" */
+function parsePRParam(param?: string): SelectedPR | null {
+  if (!param) return null;
+  const parts = param.split(":");
+  if (parts[0] === "gitlab" && parts.length === 3) {
+    return { provider: "gitlab", projectId: Number(parts[1]), iid: Number(parts[2]) };
+  }
+  if (parts[0] === "github" && parts.length >= 3) {
+    // repo may contain colons in "owner/repo", rejoin remaining parts
+    const num = Number(parts[parts.length - 1]);
+    const repo = parts.slice(1, -1).join(":");
+    return { provider: "github", repo, number: num };
+  }
+  return null;
+}
+
 function SourceControlPage() {
   const [tab, setTab] = useState<Tab>("mine");
-  const [selectedPR, setSelectedPR] = useState<SelectedPR | null>(null);
+  const navigate = useNavigate();
+  const { pr: prParam } = useSearch({ from: "/source-control" });
+  const [selectedPR, setSelectedPR] = useState<SelectedPR | null>(() => parsePRParam(prParam));
+
+  // Auto-select PR from URL param, then clear it
+  useEffect(() => {
+    if (prParam) {
+      const parsed = parsePRParam(prParam);
+      if (parsed) setSelectedPR(parsed);
+      navigate({ to: "/source-control", search: {}, replace: true });
+    }
+  }, [prParam, navigate]);
   const [showTeamSetup, setShowTeamSetup] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const autoMergeTodoQuery = trpc.settings.get.useQuery({ key: "sourceControl.autoMergeTodo" });
@@ -503,7 +530,6 @@ function SourceControlPage() {
   );
   const { data: teamMembers } = trpc.team.members.useQuery();
   const utils = trpc.useUtils();
-  const navigate = useNavigate();
   const setSelectedAgentId = useAgentsStore((s) => s.setSelectedAgentId);
   const spawnAgent = trpc.agents.spawn.useMutation({
     onSuccess: (data) => {
@@ -772,4 +798,7 @@ export const sourceControlRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/source-control",
   component: SourceControlPage,
+  validateSearch: (search: Record<string, unknown>) => ({
+    pr: (search.pr as string) || undefined,
+  }),
 });

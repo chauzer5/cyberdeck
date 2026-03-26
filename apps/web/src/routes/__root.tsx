@@ -1,5 +1,8 @@
 import { createRootRoute, Outlet } from "@tanstack/react-router";
+import { useEffect } from "react";
 import { Sidebar } from "@/components/layout/Sidebar";
+import { CommandBar } from "@/components/command-bar/CommandBar";
+import { useLayoutStore } from "@/stores/layout";
 import { useTheme } from "@/hooks/useTheme";
 
 const PARTICLES = [
@@ -15,6 +18,20 @@ const PARTICLES = [
 
 function RootLayout() {
   const { theme } = useTheme();
+  const commandBarOpen = useLayoutStore((s) => s.commandBarOpen);
+  const setCommandBarOpen = useLayoutStore((s) => s.setCommandBarOpen);
+
+  // Global Cmd+K / Ctrl+K shortcut
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+        e.preventDefault();
+        setCommandBarOpen(!commandBarOpen);
+      }
+    }
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [commandBarOpen, setCommandBarOpen]);
 
   return (
     <div className="flex h-screen overflow-hidden">
@@ -52,6 +69,10 @@ function RootLayout() {
           <Outlet />
         </div>
       </main>
+
+      {commandBarOpen && (
+        <CommandBar onClose={() => setCommandBarOpen(false)} />
+      )}
     </div>
   );
 }

@@ -1,6 +1,6 @@
-import { createRoute } from "@tanstack/react-router";
+import { createRoute, useSearch, useNavigate } from "@tanstack/react-router";
 import { rootRoute } from "./__root";
-import { useState, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import {
   LayoutList,
   ArrowLeft,
@@ -407,7 +407,17 @@ type Tab = "mine" | "team" | "ready";
 
 function LinearPage() {
   const [tab, setTab] = useState<Tab>("mine");
-  const [selectedIssue, setSelectedIssue] = useState<string | null>(null);
+  const { issue: issueParam } = useSearch({ from: "/linear" });
+  const navTo = useNavigate();
+  const [selectedIssue, setSelectedIssue] = useState<string | null>(issueParam ?? null);
+
+  // Auto-select issue from URL param, then clear it
+  useEffect(() => {
+    if (issueParam) {
+      setSelectedIssue(issueParam);
+      navTo({ to: "/linear", search: {}, replace: true });
+    }
+  }, [issueParam, navTo]);
   const [showTeamSetup, setShowTeamSetup] = useState(false);
   const [showBoardPicker, setShowBoardPicker] = useState(false);
   const [syncing, setSyncing] = useState(false);
@@ -647,4 +657,7 @@ export const linearRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/linear",
   component: LinearPage,
+  validateSearch: (search: Record<string, unknown>) => ({
+    issue: (search.issue as string) || undefined,
+  }),
 });

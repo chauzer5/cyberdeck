@@ -4,10 +4,14 @@ interface LayoutState {
   sidebarOpen: boolean;
   toggleSidebar: () => void;
   setSidebarOpen: (open: boolean) => void;
+  commandBarOpen: boolean;
+  setCommandBarOpen: (open: boolean) => void;
 }
 
 export const useLayoutStore = create<LayoutState>((set) => ({
   sidebarOpen: true,
   toggleSidebar: () => set((s) => ({ sidebarOpen: !s.sidebarOpen })),
   setSidebarOpen: (open) => set({ sidebarOpen: open }),
+  commandBarOpen: false,
+  setCommandBarOpen: (open) => set({ commandBarOpen: open }),
 }));

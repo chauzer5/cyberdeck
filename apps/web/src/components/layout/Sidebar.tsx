@@ -16,6 +16,7 @@ import {
   Bell,
   GitPullRequest,
   AlertCircle,
+  Search,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { cn, timeAgo } from "@/lib/utils";
@@ -197,7 +198,7 @@ function NotificationsDropdown({ collapsed }: { collapsed: boolean }) {
 }
 
 export function Sidebar() {
-  const { sidebarOpen, toggleSidebar } = useLayoutStore();
+  const { sidebarOpen, toggleSidebar, setCommandBarOpen } = useLayoutStore();
   const routerState = useRouterState();
   const currentPath = routerState.location.pathname;
   const { enabled: slackEnabled } = useSlackEnabled();
@@ -343,6 +344,28 @@ export function Sidebar() {
           </div>
         ))}
       </nav>
+
+      {/* Search */}
+      <div className="px-2 pb-1">
+        <button
+          onClick={() => setCommandBarOpen(true)}
+          className={cn(
+            "flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-[13px] font-medium transition-all duration-200",
+            "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+            !sidebarOpen && "justify-center px-0",
+          )}
+        >
+          <Search className="h-4 w-4 shrink-0 opacity-60" />
+          {sidebarOpen && (
+            <>
+              <span>Search</span>
+              <kbd className="ml-auto flex items-center rounded border border-border bg-[rgba(0,0,0,0.3)] px-1.5 py-0.5 text-[10px] font-mono text-text-muted">
+                <span className="text-[13px] leading-none -translate-y-px">⌘</span>K
+              </kbd>
+            </>
+          )}
+        </button>
+      </div>
 
       {/* Notifications */}
       <div className="px-2 pb-1">
