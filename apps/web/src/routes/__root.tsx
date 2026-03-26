@@ -1,4 +1,4 @@
-import { createRootRoute, Outlet } from "@tanstack/react-router";
+import { createRootRoute, Outlet, useRouterState } from "@tanstack/react-router";
 import { useEffect } from "react";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { CommandBar } from "@/components/command-bar/CommandBar";
@@ -20,6 +20,9 @@ function RootLayout() {
   const { theme } = useTheme();
   const commandBarOpen = useLayoutStore((s) => s.commandBarOpen);
   const setCommandBarOpen = useLayoutStore((s) => s.setCommandBarOpen);
+  const vscodeIframeMounted = useLayoutStore((s) => s.vscodeIframeMounted);
+  const currentPath = useRouterState({ select: (s) => s.location.pathname });
+  const isOnCodePage = currentPath === "/code";
 
   // Global Cmd+K / Ctrl+K shortcut
   useEffect(() => {
@@ -68,6 +71,25 @@ function RootLayout() {
         <div className="h-full overflow-auto">
           <Outlet />
         </div>
+        {/* Persistent VS Code iframe — rendered in root so it survives route changes.
+            Visible only on /code, but stays mounted (hidden) on other pages to preserve state. */}
+        {vscodeIframeMounted && (
+          <div
+            id="vscode-iframe-container"
+            className="absolute inset-0"
+            style={{
+              visibility: isOnCodePage ? "visible" : "hidden",
+              zIndex: isOnCodePage ? 10 : -1,
+            }}
+          >
+            <iframe
+              src="http://127.0.0.1:8767"
+              className="h-full w-full border-0"
+              title="VS Code"
+              allow="clipboard-read; clipboard-write"
+            />
+          </div>
+        )}
       </main>
 
       {commandBarOpen && (

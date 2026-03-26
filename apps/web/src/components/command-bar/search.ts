@@ -9,6 +9,7 @@ import {
   Settings,
   GitPullRequest,
   ListTodo,
+  Code2,
 } from "lucide-react";
 
 // ── Types ──
@@ -41,6 +42,7 @@ const PAGES: SearchResult[] = [
   { id: "page-linear", category: "pages", title: "Linear", icon: LayoutList, action: { type: "navigate", to: "/linear" } },
   { id: "page-slack", category: "pages", title: "Slack", icon: MessageSquare, action: { type: "navigate", to: "/slack" } },
   { id: "page-agents", category: "pages", title: "Agents", icon: Bot, action: { type: "navigate", to: "/agents" } },
+  { id: "page-code", category: "pages", title: "Code", icon: Code2, action: { type: "navigate", to: "/code" } },
   { id: "page-settings", category: "pages", title: "Settings", icon: Settings, action: { type: "navigate", to: "/settings" } },
 ];
 

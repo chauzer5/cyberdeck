@@ -7,6 +7,7 @@ import { sourceControlRouter } from "./integrations/source-control/router.js";
 import { linearRouter } from "./integrations/linear/router.js";
 import { teamRouter } from "./team/router.js";
 import { notificationsRouter } from "./notifications/router.js";
+import { vscodeRouter } from "./vscode/router.js";
 
 export const appRouter = router({
   health: router({
@@ -22,6 +23,7 @@ export const appRouter = router({
   linear: linearRouter,
   team: teamRouter,
   notifications: notificationsRouter,
+  vscode: vscodeRouter,
 });
 
 export type AppRouter = typeof appRouter;

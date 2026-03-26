@@ -8,5 +8,6 @@ import { teamsRoute } from "./routes/teams";
 import { workflowsRoute } from "./routes/workflows";
 import { settingsRoute } from "./routes/settings";
 import { todosRoute } from "./routes/todos";
+import { codeRoute } from "./routes/code";
 
-export const routeTree = rootRoute.addChildren([indexRoute, agentsRoute, slackRoute, sourceControlRoute, linearRoute, teamsRoute, workflowsRoute, settingsRoute, todosRoute]);
+export const routeTree = rootRoute.addChildren([indexRoute, agentsRoute, slackRoute, sourceControlRoute, linearRoute, teamsRoute, workflowsRoute, settingsRoute, todosRoute, codeRoute]);

@@ -6,6 +6,8 @@ interface LayoutState {
   setSidebarOpen: (open: boolean) => void;
   commandBarOpen: boolean;
   setCommandBarOpen: (open: boolean) => void;
+  vscodeIframeMounted: boolean;
+  setVscodeIframeMounted: (mounted: boolean) => void;
 }
 
 export const useLayoutStore = create<LayoutState>((set) => ({
@@ -14,4 +16,6 @@ export const useLayoutStore = create<LayoutState>((set) => ({
   setSidebarOpen: (open) => set({ sidebarOpen: open }),
   commandBarOpen: false,
   setCommandBarOpen: (open) => set({ commandBarOpen: open }),
+  vscodeIframeMounted: false,
+  setVscodeIframeMounted: (mounted) => set({ vscodeIframeMounted: mounted }),
 }));
