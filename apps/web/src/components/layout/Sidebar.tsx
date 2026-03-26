@@ -27,6 +27,7 @@ import { useSourceControlEnabled } from "@/hooks/useSourceControlEnabled";
 import { useLinearEnabled } from "@/hooks/useLinearEnabled";
 import { useAgentsEnabled } from "@/hooks/useAgentsEnabled";
 import { useTodosEnabled } from "@/hooks/useTodosEnabled";
+import { useCodeEnabled } from "@/hooks/useCodeEnabled";
 import { useWebSocket } from "@/hooks/useWebSocket";
 import { trpc } from "@/trpc";
 
@@ -207,6 +208,7 @@ export function Sidebar() {
   const { enabled: linearEnabled } = useLinearEnabled();
   const { enabled: agentsEnabled } = useAgentsEnabled();
   const { enabled: todosEnabled } = useTodosEnabled();
+  const { enabled: codeEnabled } = useCodeEnabled();
 
   const todosQuery = trpc.todos.listAll.useQuery(undefined, { refetchInterval: 30_000 });
   const activeTodoCount = todosQuery.data?.counts.active ?? 0;
@@ -228,7 +230,7 @@ export function Sidebar() {
         ...(linearEnabled ? [{ icon: LayoutList, label: "Linear", href: "/linear" } as const] : []),
         ...(slackEnabled ? [{ icon: MessageSquare, label: "Slack", href: "/slack" } as const] : []),
         ...(agentsEnabled ? [{ icon: Bot, label: "Agents", href: "/agents" } as const] : []),
-        { icon: Code2, label: "Code", href: "/code" } as const,
+        ...(codeEnabled ? [{ icon: Code2, label: "Code", href: "/code" } as const] : []),
       ],
     },
     {

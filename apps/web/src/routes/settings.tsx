@@ -14,6 +14,7 @@ import {
   AlertCircle,
   X,
   Palette,
+  Code2,
 } from "lucide-react";
 import { trpc } from "@/trpc";
 import { cn } from "@/lib/utils";
@@ -304,6 +305,8 @@ function SettingsPage() {
   const todosEnabled = todosEnabled_.data !== "false";
   const agentsEnabled_ = trpc.settings.get.useQuery({ key: "agents.enabled" });
   const agentsEnabled = agentsEnabled_.data !== "false";
+  const codeEnabled_ = trpc.settings.get.useQuery({ key: "code.enabled" });
+  const codeEnabled = codeEnabled_.data !== "false";
   const toggleSetting = trpc.settings.set.useMutation({
     onSuccess: () => {
       utils.settings.get.invalidate();
@@ -515,6 +518,29 @@ function SettingsPage() {
             </div>
             <div className="space-y-5 p-5">
               <AgentCwdSetting />
+            </div>
+          </section>
+
+          {/* Code section */}
+          <section className="rounded-xl border border-border bg-card">
+            <div className="flex items-center gap-2.5 px-5 py-3.5">
+              <Code2 className="h-4 w-4 text-neon-pink" />
+              <h2 className="text-sm font-semibold text-cream">Code</h2>
+              <div className="ml-auto flex items-center gap-2">
+                <span className="text-xs text-text-muted">
+                  {codeEnabled ? "Enabled" : "Disabled"}
+                </span>
+                <button
+                  onClick={() => toggleSetting.mutate({ key: "code.enabled", value: codeEnabled ? "false" : "true" })}
+                  className="flex items-center text-text-muted transition-colors hover:text-cream"
+                >
+                  {codeEnabled ? (
+                    <ToggleRight className="h-5 w-5 text-neon-pink" />
+                  ) : (
+                    <ToggleLeft className="h-5 w-5" />
+                  )}
+                </button>
+              </div>
             </div>
           </section>
         </div>
