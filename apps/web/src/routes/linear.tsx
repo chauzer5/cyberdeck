@@ -12,8 +12,11 @@ import {
   Settings,
   Check,
   Play,
+  Sparkles,
+  Wrench,
 } from "lucide-react";
 import { trpc } from "@/trpc";
+import { useAgentsStore } from "@/stores/agents";
 import { cn, timeAgo } from "@/lib/utils";
 import { TeamSetupModal } from "@/components/TeamSetupModal";
 
@@ -87,7 +90,7 @@ interface LinearIssue {
 
 // ── Issue Card ──
 
-function IssueCard({ issue, onOpen, onStart, starting }: { issue: LinearIssue; onOpen: (id: string) => void; onStart?: (issueId: string) => void; starting?: boolean }) {
+function IssueCard({ issue, onOpen, onStart, starting, onEnrich, onWork }: { issue: LinearIssue; onOpen: (id: string) => void; onStart?: (issueId: string) => void; starting?: boolean; onEnrich?: () => void; onWork?: () => void }) {
   return (
     <div className="flex items-center gap-2 rounded-lg border border-border bg-[rgba(255,45,123,0.02)] px-3.5 py-3 transition-all hover:border-border-hover hover:bg-[rgba(255,45,123,0.04)]">
       <button
@@ -129,23 +132,45 @@ function IssueCard({ issue, onOpen, onStart, starting }: { issue: LinearIssue; o
           </div>
         )}
       </button>
-      {onStart && (
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            onStart(issue.id);
-          }}
-          disabled={starting}
-          className="flex shrink-0 items-center gap-1.5 rounded-lg border border-border bg-[rgba(0,255,136,0.08)] px-3 py-1.5 text-[11px] font-medium text-neon-green transition-colors hover:bg-[rgba(0,255,136,0.15)] disabled:opacity-50"
-        >
-          {starting ? (
-            <Loader2 className="h-3 w-3 animate-spin" />
-          ) : (
-            <Play className="h-3 w-3" />
-          )}
-          Start
-        </button>
-      )}
+      <div className="flex shrink-0 items-center gap-2">
+        {onEnrich && (
+          <button
+            onClick={(e) => { e.stopPropagation(); onEnrich(); }}
+            className="flex items-center gap-1 rounded-md border border-neon-pink/30 bg-[rgba(255,45,123,0.08)] px-2 py-1.5 text-[10px] font-medium text-neon-pink transition-all hover:border-neon-pink/60 hover:bg-[rgba(255,45,123,0.15)] hover:shadow-[0_0_8px_rgba(255,45,123,0.3)]"
+            title="Launch agent to enrich ticket"
+          >
+            <Sparkles className="h-3 w-3" />
+            Enrich
+          </button>
+        )}
+        {onWork && (
+          <button
+            onClick={(e) => { e.stopPropagation(); onWork(); }}
+            className="flex items-center gap-1 rounded-md border border-neon-cyan/30 bg-[rgba(34,211,238,0.08)] px-2 py-1.5 text-[10px] font-medium text-neon-cyan transition-all hover:border-neon-cyan/60 hover:bg-[rgba(34,211,238,0.15)] hover:shadow-[0_0_8px_rgba(34,211,238,0.3)]"
+            title="Launch agent to work on ticket"
+          >
+            <Wrench className="h-3 w-3" />
+            Work
+          </button>
+        )}
+        {onStart && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onStart(issue.id);
+            }}
+            disabled={starting}
+            className="flex shrink-0 items-center gap-1.5 rounded-lg border border-border bg-[rgba(0,255,136,0.08)] px-3 py-1.5 text-[11px] font-medium text-neon-green transition-colors hover:bg-[rgba(0,255,136,0.15)] disabled:opacity-50"
+          >
+            {starting ? (
+              <Loader2 className="h-3 w-3 animate-spin" />
+            ) : (
+              <Play className="h-3 w-3" />
+            )}
+            Start
+          </button>
+        )}
+      </div>
     </div>
   );
 }
@@ -167,7 +192,7 @@ function groupByStatus(issues: LinearIssue[]): { status: string; statusType: str
     .sort((a, b) => (STATUS_ORDER[a.statusType] ?? 99) - (STATUS_ORDER[b.statusType] ?? 99));
 }
 
-function GroupedIssueList({ issues, onOpen }: { issues: LinearIssue[]; onOpen: (id: string) => void }) {
+function GroupedIssueList({ issues, onOpen, onEnrich, onWork }: { issues: LinearIssue[]; onOpen: (id: string) => void; onEnrich?: (issue: LinearIssue) => void; onWork?: (issue: LinearIssue) => void }) {
   if (issues.length === 0) {
     return (
       <div className="flex items-center justify-center pt-16">
@@ -197,7 +222,7 @@ function GroupedIssueList({ issues, onOpen }: { issues: LinearIssue[]; onOpen: (
               const i = animIndex++;
               return (
                 <div key={issue.id} className={cn("animate-glass-in", `stagger-${Math.min(i + 1, 5)}`)}>
-                  <IssueCard issue={issue} onOpen={onOpen} />
+                  <IssueCard issue={issue} onOpen={onOpen} onEnrich={onEnrich ? () => onEnrich(issue) : undefined} onWork={onWork ? () => onWork(issue) : undefined} />
                 </div>
               );
             })}
@@ -351,7 +376,7 @@ function IssueDetailView({
 
 // ── Board Picker Modal ──
 
-function BoardPickerModal({ onClose }: { onClose: () => void }) {
+function BoardPickerModal({ onClose, onBoardChanged }: { onClose: () => void; onBoardChanged?: () => void }) {
   const { data: teams, isLoading } = trpc.linear.teams.useQuery();
   const currentTeamId = trpc.settings.get.useQuery({ key: "linear.readyTeamId" });
   const setSetting = trpc.settings.set.useMutation();
@@ -364,6 +389,7 @@ function BoardPickerModal({ onClose }: { onClose: () => void }) {
         onSuccess: () => {
           utils.settings.get.invalidate({ key: "linear.readyTeamId" });
           utils.linear.readyIssues.invalidate();
+          onBoardChanged?.();
           onClose();
         },
       },
@@ -450,6 +476,27 @@ function LinearPage() {
   );
   const { data: teamMembers } = trpc.team.members.useQuery();
   const utils = trpc.useUtils();
+  const setSelectedAgentId = useAgentsStore((s) => s.setSelectedAgentId);
+  const spawnAgent = trpc.agents.spawn.useMutation({
+    onSuccess: (data) => {
+      setSelectedAgentId(data.id);
+      navTo({ to: "/agents" });
+    },
+  });
+
+  const handleEnrich = useCallback((issue: LinearIssue) => {
+    spawnAgent.mutate({
+      prompt: `/linear-enrich-ticket ${issue.identifier}`,
+      name: `Enrich ${issue.identifier}`,
+    });
+  }, [spawnAgent]);
+
+  const handleWork = useCallback((issue: LinearIssue) => {
+    spawnAgent.mutate({
+      prompt: `/linear-work-on-ticket ${issue.identifier}`,
+      name: `Work ${issue.identifier}`,
+    });
+  }, [spawnAgent]);
   const syncMutation = trpc.linear.sync.useMutation({
     onSuccess: () => {
       utils.linear.issues.invalidate();
@@ -672,14 +719,14 @@ function LinearPage() {
         )}
         {/* Mine tab */}
         {!isLoading && !isError && tab === "mine" && (
-          <GroupedIssueList issues={myIssues} onOpen={setSelectedIssue} />
+          <GroupedIssueList issues={myIssues} onOpen={setSelectedIssue} onEnrich={handleEnrich} onWork={handleWork} />
         )}
       </div>
 
       {/* Team setup modal */}
       {showTeamSetup && <TeamSetupModal onClose={() => setShowTeamSetup(false)} />}
       {/* Board picker modal */}
-      {showBoardPicker && <BoardPickerModal onClose={() => setShowBoardPicker(false)} />}
+      {showBoardPicker && <BoardPickerModal onClose={() => setShowBoardPicker(false)} onBoardChanged={() => syncMutation.mutate()} />}
     </div>
   );
 }
