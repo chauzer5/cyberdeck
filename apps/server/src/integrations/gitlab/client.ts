@@ -79,6 +79,8 @@ export interface MergeRequest {
   id: number;
   iid: number;
   project_id: number;
+  /** Human-readable project path extracted from web_url (e.g. "group/project") */
+  project_path: string;
   title: string;
   draft: boolean;
   author: string;
@@ -216,11 +218,18 @@ export async function listGroupMembers(): Promise<GitLabMember[]> {
 
 // ── Helpers ──
 
+/** Extract "group/project" from a GitLab MR web_url like "https://gitlab.com/group/project/-/merge_requests/123" */
+function projectPathFromUrl(webUrl: string): string {
+  const match = webUrl.match(/^https?:\/\/[^/]+\/(.+?)\/-\/merge_requests\//);
+  return match?.[1] ?? "";
+}
+
 function toMergeRequest(raw: MergeRequestRaw): MergeRequest {
   return {
     id: raw.id,
     iid: raw.iid,
     project_id: raw.project_id,
+    project_path: projectPathFromUrl(raw.web_url),
     title: raw.title,
     draft: raw.draft ?? false,
     author: raw.author.name,

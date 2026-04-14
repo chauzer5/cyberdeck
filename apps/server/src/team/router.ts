@@ -40,7 +40,20 @@ export const teamRouter = router({
           // prefer longer/more complete name
           if (name.length > existing.name.length) existing.name = name;
         } else {
-          byEmail.set(key, { name, email, sources: [source] });
+          // Check if same person was already added without email (by name)
+          const nameIdx = byNameOnly.findIndex(
+            (p) => p.name.toLowerCase() === name.toLowerCase(),
+          );
+          if (nameIdx !== -1) {
+            // Promote from byNameOnly → byEmail, merging sources
+            const prev = byNameOnly[nameIdx];
+            const mergedSources = [...prev.sources];
+            if (!mergedSources.includes(source)) mergedSources.push(source);
+            byEmail.set(key, { name, email, sources: mergedSources });
+            byNameOnly.splice(nameIdx, 1);
+          } else {
+            byEmail.set(key, { name, email, sources: [source] });
+          }
         }
       } else {
         // No email — check if name matches an existing entry

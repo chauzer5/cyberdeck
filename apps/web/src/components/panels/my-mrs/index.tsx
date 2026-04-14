@@ -52,7 +52,7 @@ export function MyMRsPanel() {
               key={mr.id}
               onClick={() => {
                 const prParam = mr.provider === "gitlab"
-                  ? `gitlab:${mr.repo}:${mr.number}`
+                  ? `gitlab:${mr.project_id}:${mr.number}`
                   : `github:${mr.repo}:${mr.number}`;
                 navigate({ to: "/source-control", search: { pr: prParam } });
               }}
@@ -62,6 +62,9 @@ export function MyMRsPanel() {
                 <div className="flex items-center gap-1.5">
                   <span className="text-[10px] font-mono text-neon-pink">
                     {mr.provider === "gitlab" ? "!" : "#"}{mr.number}
+                  </span>
+                  <span className="text-[10px] font-mono text-text-muted">
+                    {mr.repo.split("/").pop()}
                   </span>
                   {mr.draft && (
                     <span className="rounded-full bg-[rgba(107,114,128,0.15)] px-1.5 py-0.5 text-[9px] font-semibold text-text-muted">

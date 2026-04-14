@@ -127,7 +127,7 @@ export function search(query: string, sources: SearchSources): SearchResult[] {
       if (count >= MAX_PER_CATEGORY) break;
       if (tokens.length === 0 || matchesTokens(tokens, pr.title, pr.author, pr.source_branch, `!${pr.number}`)) {
         const prParam = pr.provider === "gitlab"
-          ? `gitlab:${pr.repo}:${pr.number}`
+          ? `gitlab:${pr.project_id}:${pr.number}`
           : `github:${pr.repo}:${pr.number}`;
         results.push({
           id: `pr-${pr.id}`,

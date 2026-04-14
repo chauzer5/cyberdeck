@@ -58,6 +58,7 @@ interface UnifiedPR {
   id: number;
   number: number;
   repo: string;
+  project_id?: number;
   title: string;
   draft: boolean;
   author: string;
@@ -85,9 +86,7 @@ function PRCard({
   onReview?: () => void;
   onRequestReview?: () => void;
 }) {
-  const repoShort = pr.provider === "github"
-    ? (pr.repo.split("/").pop() ?? pr.repo)
-    : pr.repo;
+  const repoShort = pr.repo.split("/").pop() ?? pr.repo;
   return (
     <button
       onClick={onSelect}
@@ -750,7 +749,7 @@ function SourceControlPage() {
                     pr={pr}
                     onSelect={() => {
                       if (pr.provider === "gitlab") {
-                        setSelectedPR({ provider: "gitlab", projectId: Number(pr.repo), iid: pr.number });
+                        setSelectedPR({ provider: "gitlab", projectId: pr.project_id!, iid: pr.number });
                       } else {
                         setSelectedPR({ provider: "github", repo: pr.repo, number: pr.number });
                       }
@@ -780,7 +779,7 @@ function SourceControlPage() {
                     pr={pr}
                     onSelect={() => {
                       if (pr.provider === "gitlab") {
-                        setSelectedPR({ provider: "gitlab", projectId: Number(pr.repo), iid: pr.number });
+                        setSelectedPR({ provider: "gitlab", projectId: pr.project_id!, iid: pr.number });
                       } else {
                         setSelectedPR({ provider: "github", repo: pr.repo, number: pr.number });
                       }

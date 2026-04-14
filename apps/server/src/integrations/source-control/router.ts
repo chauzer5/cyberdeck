@@ -32,8 +32,10 @@ export interface UnifiedPR {
   id: number;
   /** PR number (GitHub) or MR iid (GitLab) */
   number: number;
-  /** "owner/repo" (GitHub) or project_id as string (GitLab) */
+  /** "owner/repo" (GitHub) or "group/project" path (GitLab) */
   repo: string;
+  /** GitLab project_id for API calls (only present for GitLab MRs) */
+  project_id?: number;
   title: string;
   draft: boolean;
   author: string;
@@ -56,7 +58,8 @@ function gitlabToUnified(mr: EnrichedMergeRequest): UnifiedPR {
     provider: "gitlab",
     id: mr.id,
     number: mr.iid,
-    repo: String(mr.project_id),
+    repo: mr.project_path,
+    project_id: mr.project_id,
     title: mr.title,
     draft: mr.draft,
     author: mr.author,
